@@ -16,3 +16,7 @@ Session.vim
 [._]sw[a-p]
 
 /viewer/csv
+log/
+output/
+__pycache__/
+CHA*/
