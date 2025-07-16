@@ -10,8 +10,10 @@ from sentence_transformers import SentenceTransformer
 from peft import LoraConfig, PeftModel
 from src.llama.modeling_llama import LlamaForCausalLMWithBeacon
 from src.qwen2.modeling_qwen2 import Qwen2ForCausalLMWithBeacon
+from src.mistral.modeling_mistral import MistralForCausalLMWithBeacon
 from transformers.models.llama.modeling_llama import LlamaForCausalLM
 from transformers.models.qwen2.modeling_qwen2 import Qwen2ForCausalLM
+from transformers.models.mistral.modeling_mistral import MistralForCausalLM
 
 
 class StopTrainingCallback(TrainerCallback):
@@ -24,6 +26,7 @@ class StopTrainingCallback(TrainerCallback):
 MODEL_MAP = {
     "llama": LlamaForCausalLMWithBeacon,
     "qwen": Qwen2ForCausalLMWithBeacon,
+    "mistral": MistralForCausalLMWithBeacon,
 }
 def load_model_and_tokenizer(
         model_args, 
