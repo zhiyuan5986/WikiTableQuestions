@@ -116,15 +116,25 @@ if __name__ == "__main__":
         logger.info(f"Loaded dataset from {data_args.save_path}")
     except:
         samples = []
-        df = pd.read_csv(data_args.dataset_path, sep='\t')
         logger.info(f"Loading dataset from {data_args.dataset_path}")
-        for row in tqdm(df.iterrows()):
-            filename = row[1]['context']
-            try:
-                sample = pd.read_csv(filename, encoding='utf-8', on_bad_lines='skip')
-                samples.append({"df": sample})
-            except:
-                pass
+        if "." not in data_args.dataset_path:
+            df = pd.read_csv(os.path.join(data_args.dataset_path, "saved_file_list.csv"), sep='\t')
+            for row in tqdm(df.iterrows()):
+                filename = row[1]['context']
+                try:
+                    sample = pd.read_csv(os.path.join(data_args.dataset_path, filename), encoding='utf-8', on_bad_lines='skip')
+                    samples.append({"df": sample})
+                except:
+                    pass
+        else:
+            df = pd.read_csv(data_args.dataset_path, sep='\t')
+            for row in tqdm(df.iterrows()):
+                filename = row[1]['context']
+                try:
+                    sample = pd.read_csv(filename, encoding='utf-8', on_bad_lines='skip')
+                    samples.append({"df": sample})
+                except:
+                    pass
         logger.info(f"Loaded {len(samples)} samples from {data_args.dataset_path}")
         processed_samples = []
         for sample in tqdm(samples):
@@ -135,8 +145,9 @@ if __name__ == "__main__":
         train_dataset.save_to_disk(data_args.save_path)
     train_dataset.shuffle(seed=training_args.seed)
     eval_dataset = None
-    # filter out training sample that token length less than 2400 (redpajama)
-    # train_dataset = train_dataset.filter(lambda x: len(tokenizer.encode(x["text"])) >= 2400, num_proc=32)  
+    # filter out training sample that token length less than 1024 (totto)
+    if "." not in data_args.dataset_path:
+        train_dataset = train_dataset.filter(lambda x: len(x['label_ids']) >= 1024, num_proc=32)  
 
     trainer = CHATrainer(
         model=model,
