@@ -31,6 +31,8 @@ if __name__ == "__main__":
         model_name = "qwen"
     elif "mistral" in model_args.model_name_or_path.lower():
         model_name = "mistral"
+    elif "deepseek" in model_args.model_name_or_path.lower():
+        model_name = "deepseek"
     else:
         raise ValueError("Unsupported model name. Please use a model from Llama, Qwen, or Mistral.")
     local_rank = str(os.environ.get("LOCAL_RANK", 0))

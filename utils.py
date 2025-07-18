@@ -25,6 +25,7 @@ class StopTrainingCallback(TrainerCallback):
             control.should_training_stop = True
 MODEL_MAP = {
     "llama": LlamaForCausalLMWithBeacon,
+    "deepseek": LlamaForCausalLMWithBeacon,
     "qwen": Qwen2ForCausalLMWithBeacon,
     "mistral": MistralForCausalLMWithBeacon,
 }

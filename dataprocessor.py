@@ -47,9 +47,8 @@ class SamplePreprocessor:
         is_beacon = [0] * len(input_ids)
 
         # table
-        length = 0
+        length = len(input_ids)
         row_nums = 0
-        label_ids = []
         for row_idx, row in enumerate(rows):
             row_input_ids, row_segment_ids, row_is_beacon = self.tokenize_row(row, row_idx)
             if length + len(row_input_ids) > self.max_length:
