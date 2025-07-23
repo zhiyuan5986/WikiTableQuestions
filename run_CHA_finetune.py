@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 import math
+import json
 import datetime
 import transformers
 import pandas as pd
@@ -11,7 +12,7 @@ from transformers.trainer_utils import get_last_checkpoint
 from transformers import set_seed
 import datasets
 from datasets import DatasetDict, Dataset, load_dataset, load_from_disk
-from dataprocessor import SamplePreprocessorForPretrain, CHADataCollator
+from dataprocessor import SamplePreprocessorForFinetune, CHADataCollator
 from trainer import CHATrainer
 # from src.llama.modeling_llama import LlamaForCausalLMWithBeacon
 from args import parse_args
@@ -42,15 +43,15 @@ if __name__ == "__main__":
 
     # import wandb
     # wandb.login(key = '2dbf72a244cd2141d63b7191be9de6f90ef4056b')
-    # wandb.init(project = 'CHA_pretrain', name = training_args.run_name)
+    # wandb.init(project = 'CHA_finetune', name = training_args.run_name)
     # import swanlab
-    # swanlab.init(project='CHA_pretrain', name=training_args.run_name, config=vars(training_args))
+    # swanlab.init(project='CHA_finetune', name=training_args.run_name, config=vars(training_args))
     from swanlab.integration.transformers import SwanLabCallback
-    swanlab_callback = SwanLabCallback(project="CHA_pretrain", experiment_name=training_args.run_name, config=vars(training_args))
+    swanlab_callback = SwanLabCallback(project="CHA_finetune", experiment_name=training_args.run_name, config=vars(training_args))
     training_args.report_to = []
 
     # Logging stuff
-    send_example_telemetry("run_CHA_pretrain", model_args, data_args)
+    send_example_telemetry("run_CHA_finetune", model_args, data_args)
 
     # Setup logging
     logging.basicConfig(
@@ -104,52 +105,32 @@ if __name__ == "__main__":
     # Set seed before initializing model.
     set_seed(training_args.seed)
 
-    # tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+    # tokenizer = AutoTokenizer.from_finetuneed(args.model_name_or_path)
     model, tokenizer = load_model_and_tokenizer(
         model_args = model_args, 
         model_name = model_name
     )
-    preprocessor = SamplePreprocessorForPretrain(tokenizer=tokenizer, beacon_size=custom_args.beacon_size, max_length=data_args.max_length)
+    preprocessor = SamplePreprocessorForFinetune(tokenizer=tokenizer, beacon_size=custom_args.beacon_size, max_length=data_args.max_length)
     data_collator = CHADataCollator()
     if data_args.dataset_path is None:
         raise ValueError("Please provide the dataset path with --dataset_path")
-    try:
-        train_dataset = load_from_disk(data_args.save_path)
-        logger.info(f"Loaded dataset from {data_args.save_path}")
-    except:
-        samples = []
-        logger.info(f"Loading dataset from {data_args.dataset_path}")
-        if "." not in data_args.dataset_path:
-            df = pd.read_csv(os.path.join(data_args.dataset_path, "saved_file_list.csv"), sep='\t')
-            for row in tqdm(df.iterrows()):
-                filename = row[1]['context']
-                try:
-                    sample = pd.read_csv(os.path.join(data_args.dataset_path, filename), encoding='utf-8', on_bad_lines='skip')
-                    samples.append({"df": sample})
-                except:
-                    pass
-        else:
-            df = pd.read_csv(data_args.dataset_path, sep='\t')
-            for row in tqdm(df.iterrows()):
-                filename = row[1]['context']
-                try:
-                    sample = pd.read_csv(filename, encoding='utf-8', on_bad_lines='skip')
-                    samples.append({"df": sample})
-                except:
-                    pass
-        logger.info(f"Loaded {len(samples)} samples from {data_args.dataset_path}")
-        processed_samples = []
-        for sample in tqdm(samples):
-            processed_sample = preprocessor(sample)
-            processed_samples.append(processed_sample)
-        logger.info(f"Processed {len(processed_samples)} samples")
-        train_dataset = Dataset.from_list(samples)
-        train_dataset.save_to_disk(data_args.save_path)
+    train_dataset = load_dataset("json", data_files={"train": data_args.dataset_path})['train']
+    samples = []
+    for sample in tqdm(train_dataset):
+        try:
+            table_dict = json.loads(sample['table'])
+            df = pd.DataFrame(table_dict["data"], columns=table_dict["columns"])
+        except:
+            continue
+        sample['df'] = df
+        processed_sample = preprocessor(sample)
+        samples.append(processed_sample)
+    train_dataset = Dataset.from_list(samples)
+    # train_dataset.save_to_disk(data_args.save_path)
     train_dataset.shuffle(seed=training_args.seed)
     eval_dataset = None
-    # filter out training sample that token length less than 1024 (totto)
-    if "." not in data_args.dataset_path:
-        train_dataset = train_dataset.filter(lambda x: len(x['label_ids']) >= 1024, num_proc=32)  
+    # filter out training sample that token length larger than 6000
+    train_dataset = train_dataset.filter(lambda x: len(x['input_ids']) <= 6000, num_proc=32)  
 
     trainer = CHATrainer(
         model=model,

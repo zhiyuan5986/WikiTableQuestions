@@ -1,11 +1,11 @@
+import json
 import torch
 import torch.nn.functional as F
 import numpy as np
 from typing import Set
 import random
-from transformers import AutoTokenizer
-from sentence_transformers import SentenceTransformer, util
 from munch import Munch
+import pandas as pd
 
 INSTRUCTIONS = [
     "Please provide a reinterpretation of the preceding table. \n[TABLE]\n```\n",
@@ -13,7 +13,7 @@ INSTRUCTIONS = [
     "After uppacking the table above, we got: \n[TABLE]\n```\n",
     "Please offer a restatement of the table I've just read. \n[TABLE]\n```\n"
 ]
-class SamplePreprocessor:
+class SamplePreprocessorForPretrain:
     def __init__(
         self,
         tokenizer,
@@ -80,6 +80,98 @@ class SamplePreprocessor:
         sample['segment_ids'] = segment_ids
         sample['is_beacon'] = is_beacon
         # sample['attention_mask'] = attention_mask.tolist()
+        sample['label_ids'] = label_ids
+        return sample
+    
+    def tokenize_row(self, row, row_idx):
+        """
+        Tokenize a single row of the DataFrame.
+        """
+        row_input_ids = []
+        row_segment_ids = []
+        row_is_beacon = []
+        for idx, cell in enumerate(row):
+            # Tokenize each cell, add a comma if not the last cell
+            if idx == len(row) - 1:
+                cell_text = str(cell) + ","
+                cell_ids = self.tokenizer.encode(cell_text, add_special_tokens=False)
+                row_is_beacon.extend([0] * (len(cell_ids) - 1 - self.beacon_size) + [1] * self.beacon_size + [0])
+            else:
+                cell_text = str(cell)
+                cell_ids = self.tokenizer.encode(cell_text, add_special_tokens=False)
+                row_is_beacon.extend([0] * (len(cell_ids) - self.beacon_size) + [1] * self.beacon_size)
+            row_input_ids.extend(cell_ids)
+            row_segment_ids.extend([row_idx] * len(cell_ids))
+        return row_input_ids, row_segment_ids, row_is_beacon
+
+INSTRUCTION_MAP = {
+    "DP": "You are a table analyst. Your task is to answer questions based on the table content.\n\n\nThe answer should follow the format below:\n[Answer Format]\nFinal Answer: AnswerName1, AnswerName2...\n\nEnsure the final answer format is the last output line and can only be in the 'Final Answer: AnswerName1, AnswerName2...' form, no other form. Ensure the 'AnswerName' is a number or entity name, as short as possible, without any explanation.\n\n\nGive the final answer to the question directly without any explanation.\n\nRead the table below in CSV format:\n[TABLE]\n```\n",
+    "SCoT": "You are a table analyst. Your task is to utilize the Python package 'pandas' to analyze the table and then answer questions.\n[Guidelines]\nYou should act in following patterns step by step to analyze the table and then give the final answer:\n[Action Patterns]\nThought: You should always think about what to do to interact with Python code base on Result\nAction: the action can **ONLY** be single line python code\nResult: Simulate the result of the execution of the python code in Action, analyse that result and decide whether to continue or not\n(This thought/Action/Result can repeat N times)\n\n\nWhen you think the actions are enough to achieve the final answer, give the conclusion following the format below:\n[Answer Format]\nConclusion: After analyzing the table,I am confident that ...\bFinal Answer: AnswerName1, AnswerName2...\n\nEnsure the final answer format is the last output line and can only be in the 'Final Answer: AnswerName1, AnswerName2...' form, no other form. Ensure the 'AnswerName' is a number or entity name, as short as possible, without any explanation.\n\n\nLet's think step by step and then give the final answer to the question.\nEnsure to have a concluding thought that verifies the table, observations and the question before giving the final answer.\nRead the table below in CSV format:\n[TABLE]\n```\n",
+    "TCoT": "You are a table analyst. Your task is to answer questions based on the table content.\n\n\nThe answer should follow the format below:\n[Answer Format]\nFinal Answer: AnswerName1, AnswerName2...\n\nEnsure the final answer format is the last output line and can only be in the 'Final Answer: AnswerName1, AnswerName2...' form, no other form. Ensure the 'AnswerName' is a number or entity name, as short as possible, without any explanation.\n\n\nLet's think step by step and then give the final answer to the question.\n\nRead the table below in CSV format:\n[TABLE]\n```\n",
+    "PoT": "You are a data analyst proficient in Python. Your task is to write executable Python code to analyze the table and then answer questions.\n[Guidelines]\nYou should act following requirements below:\n1. based on the question, write out your analytical approach, and then write Python code according to this approach.\n2. The code needs to be concise and easy to understand, and if necessary, add comments for clarification.\n3. Code blocks need to strictly start with ```python and end with ```\n4. Your analysis must be based entirely on the above data. If the user's question is not related to data analysis, please politely refuse.\n5. You need to generate executable code. If there are results to be presented, please use the print function; if there are charts, please use the matplotlib library to draw them.\n6. Ensure to load the table with command ```df = pd.read_csv('table.csv')```\n\n\nThe generated Python code should follow the format below, and ensure the first two code lines is exactly the same with the following code block:\n[Python Code Format]\n```python\nimport pandas as pd\ndf = pd.read_csv('table.csv')\n...\nprint(f'Final Answer: {{answer}}')\n```\n\nEnsure the final answer is the last line in python code and can only be in the 'print(f'Final Answer: {{answer}}')' form, no other from. Ensure variable 'answer' can only be 'AnswerName1, AnswerName2...' form, no other form, and 'AnswerName' can only be a number or entity name, as short as possible, without any explanation.\n\n\nLet's think step by step and then generate python code to analyze table and present the final answer to the question.\n\nRead the table below in CSV format:\n[TABLE]\n```\n"
+}
+class SamplePreprocessorForFinetune:
+    def __init__(
+        self,
+        tokenizer,
+        beacon_size: int = 1,
+        max_length: int = 4096,
+    ):
+        self.tokenizer = tokenizer
+        self.beacon_size = beacon_size
+        self.max_length = max_length
+        self.beacon_token = self.tokenizer.eos_token
+        self.beacon_token_id = self.tokenizer.convert_tokens_to_ids(self.beacon_token)
+
+        # self.max_length = max_length
+        # self.dataset_type = dataset_type
+        # if dataset_type.upper() not in dir(DatasetType):
+        #     raise ValueError(f"Unsupported dataset type: {dataset_type}")
+
+
+    def __call__(self, sample, **kwargs):
+
+        df = sample['df']
+        qtype = sample['qtype']
+        qsubtype = sample['qsubtype']
+        instruction_type = sample['instruction_type']
+        instruction = INSTRUCTION_MAP[instruction_type]
+        question = f"```\n\nLet's get start!\nQuestion: {sample['question']}\n"
+        answer = sample['response']
+
+        df_aug = df.map(lambda x: str(x) + self.beacon_token * self.beacon_size)
+        rows = df_aug.values.tolist()
+
+        # instruction
+        input_ids = self.tokenizer.encode(instruction, add_special_tokens=False)
+        header_ids = self.tokenizer.encode(','.join(df.columns.to_list())+"\n", add_special_tokens=False)
+        input_ids.extend(header_ids)
+        segment_ids = [0] * len(input_ids)
+        is_beacon = [0] * len(input_ids)
+
+        # table
+        for row_idx, row in enumerate(rows):
+            row_input_ids, row_segment_ids, row_is_beacon = self.tokenize_row(row, row_idx)
+            input_ids.extend(row_input_ids)
+            segment_ids.extend(row_segment_ids)
+            is_beacon.extend(row_is_beacon)
+
+        # question
+        question_ids = self.tokenizer.encode(question, add_special_tokens=False)
+        input_ids.extend(question_ids)
+        segment_ids.extend([0] * len(question_ids))
+        is_beacon.extend([0] * len(question_ids))
+
+        # labels
+        label_ids = self.tokenizer.encode(answer, add_special_tokens=False)[:self.max_length]
+        input_ids.extend(label_ids)
+        segment_ids.extend([0] * len(label_ids))
+        is_beacon.extend([0] * len(label_ids))
+
+        del sample['df']
+        sample['input_ids'] = input_ids
+        sample['segment_ids'] = segment_ids
+        sample['is_beacon'] = is_beacon
         sample['label_ids'] = label_ids
         return sample
     

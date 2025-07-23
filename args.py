@@ -190,7 +190,7 @@ class DataTrainingArguments:
             "help": "The percentage of the train set used as validation set in case there's no validation split"
         },
     )
-    max_table_length: Optional[int] = field(
+    max_length: Optional[int] = field(
         default=None,
         metadata={
             "help": (
