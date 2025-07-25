@@ -518,31 +518,6 @@ class Qwen2ForCausalLMWithBeacon(Qwen2ForCausalLM):
     
     # def generate(self, )
 
-    def expand_attention_mask(self, attn_mask: torch.Tensor) -> torch.Tensor:
-        """
-        Given (B, 1, T, T) attention_mask, expand to (B, 1, T+1, T+1)
-        by copying the last row/column and appending one new position.
-        """
-        B, _, T, _ = attn_mask.shape
-        device = attn_mask.device
-
-        # Expand along sequence dimension
-        new_mask = torch.zeros(B, 1, T + 1, T + 1, device=device, dtype=attn_mask.dtype)
-
-        # Copy existing mask
-        new_mask[:, :, :T, :T] = attn_mask
-
-        # Copy last row → new row
-        new_mask[:, :, T, :T] = attn_mask[:, :, T - 1, :]
-
-        # Copy last column → new column
-        new_mask[:, :, :T, T] = attn_mask[:, :, :, T - 1]
-
-        # Make self visible (causal)
-        new_mask[:, :, T, T] = attn_mask[:, :, T - 1, T - 1]
-
-        return new_mask
-
     # @torch.no_grad()
     # def generate(
     #     self,
@@ -556,14 +531,14 @@ class Qwen2ForCausalLMWithBeacon(Qwen2ForCausalLM):
     #     self.eval()
     #     device = input_ids.device
     #     batch_size = input_ids.size(0)
-    #     output_ids = input_ids.clone()
+    #     input_ids = input_ids.clone()
     #     past_key_values = None
 
     #     stopped = torch.zeros(batch_size, dtype=torch.bool, device=device)
     #     eos_token_id = eos_token_id if eos_token_id is not None else self.config.eos_token_id
 
     #     for step in range(max_new_tokens):
-    #         cur_input_ids = output_ids[:, -1:] if step > 0 else input_ids
+    #         cur_input_ids = input_ids[:, -1:] if step > 0 else input_ids
     #         cur_position_ids = position_ids[:, -1:] + step if step > 0 else position_ids
     #         cur_is_beacon = is_beacon[:, -1:] if (step > 0 and is_beacon is not None) else is_beacon
 
@@ -581,7 +556,7 @@ class Qwen2ForCausalLMWithBeacon(Qwen2ForCausalLM):
 
     #         # Replace with EOS if stopped
     #         next_token = torch.where(stopped.unsqueeze(1), torch.full_like(next_token, eos_token_id), next_token)
-    #         output_ids = torch.cat([output_ids, next_token], dim=-1)
+    #         input_ids = torch.cat([input_ids, next_token], dim=-1)
     #         position_ids = torch.cat([position_ids, cur_position_ids + 1], dim=-1)
 
     #         if is_beacon is not None:
@@ -595,34 +570,71 @@ class Qwen2ForCausalLMWithBeacon(Qwen2ForCausalLM):
     #         if stopped.all():
     #             break
 
-    #     return output_ids
+    #     return input_ids
+    
+    @torch.no_grad()
+    def construct_inputs_for_generation(
+        self,
+        input_ids: torch.LongTensor,
+        attention_mask: torch.Tensor,
+        position_ids: torch.LongTensor,
+        question_ids: torch.LongTensor,
+        is_beacon: Optional[torch.BoolTensor] = None,
+    ):
+        outputs = self(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            is_beacon=is_beacon,
+            use_cache = True, # Default to be True
+        )
+        past_key_values = outputs.past_key_values
+        # select past_key_values with the help of attention_mask. 
+        # attention_mask: (1, 1, L, L)
+        # We get retain_mask = attention_mask[0, 0, -1, :], shape of (L,)
+        # Then for past_key_values = [(batch_size, num_heads, seq_len, hidden_size) for layer in range(num_layers)]
+        # We just retain past_key_values in seq_len dim
+        retain_mask = attention_mask[0, 0, -1, :] == 0
+        # print("Previous length: ", position_ids.shape[1])
+        past_key_values = [
+            (
+                key[..., retain_mask, :],    # (B, H, R, D)
+                value[..., retain_mask, :]
+            )
+            for key, value in past_key_values
+        ]
+        # print("Now length: ", past_key_values[0][0].shape[2])
+        old_length = position_ids.shape[1]
+        new_length = retain_mask.sum().item()
+        input_ids = question_ids
+        attention_mask = torch.ones((input_ids.shape[0], new_length + input_ids.shape[1]), dtype=torch.long, device=input_ids.device)
+        position_ids = torch.arange(old_length, old_length + question_ids.size(1), device=input_ids.device).unsqueeze(0)
+        return input_ids, attention_mask, position_ids, past_key_values
+
     @torch.no_grad()
     def generate(
         self,
         input_ids: torch.LongTensor,
         attention_mask: torch.Tensor,
         position_ids: torch.LongTensor,
-        max_new_tokens: int,
-        is_beacon: Optional[torch.BoolTensor] = None,
+        past_key_values: Optional[Union[Cache, List[torch.FloatTensor]]] = None,
+        max_new_tokens: int = 8000,
         eos_token_id: Optional[int] = None,
     ) -> torch.LongTensor:
+
         self.eval()
         device = input_ids.device
         batch_size = input_ids.size(0)
-        output_ids = input_ids.clone()
-        # past_key_values = None
 
-        if is_beacon is not None:
-            assert is_beacon.shape == input_ids.shape
 
         stopped = torch.zeros(batch_size, dtype=torch.bool, device=device)
         eos_token_id = eos_token_id if eos_token_id is not None else self.config.eos_token_id
 
         for step in range(max_new_tokens):
-            # no cache
-            cur_input_ids = output_ids
-            cur_position_ids = position_ids
-            cur_is_beacon = is_beacon
+
+            # with cache
+            cur_input_ids = input_ids[:, -1:] if step > 0 else input_ids
+            cur_position_ids = position_ids[:, -1:] if step > 0 else position_ids
 
             # print("current input_ids: ", cur_input_ids)
             # print("attention_mask: ", attention_mask)
@@ -632,28 +644,9 @@ class Qwen2ForCausalLMWithBeacon(Qwen2ForCausalLM):
                 input_ids=cur_input_ids,
                 attention_mask=attention_mask,
                 position_ids=cur_position_ids,
-                # past_key_values=past_key_values,
-                # use_cache=True,
-                is_beacon=cur_is_beacon,
+                past_key_values=past_key_values,
+                use_cache=True,
             )
-
-            # with cache
-            # cur_input_ids = output_ids[:, -1:] if step > 0 else output_ids
-            # cur_position_ids = position_ids[:, -1:] if step > 0 else position_ids
-            # cur_is_beacon = is_beacon[:, -1:] if (step > 0 and is_beacon is not None) else is_beacon
-
-            # # print("current input_ids: ", cur_input_ids)
-            # # print("attention_mask: ", attention_mask)
-            # # print("current position_ids: ", position_ids)
-            # # print("current is_beacon: ", cur_is_beacon)
-            # outputs = self(
-            #     input_ids=cur_input_ids,
-            #     attention_mask=attention_mask,
-            #     position_ids=cur_position_ids,
-            #     past_key_values=past_key_values,
-            #     use_cache=True,
-            #     is_beacon=cur_is_beacon,
-            # )
 
             # print("Step:", step)
 
@@ -665,21 +658,17 @@ class Qwen2ForCausalLMWithBeacon(Qwen2ForCausalLM):
                 stopped.unsqueeze(1), torch.full_like(next_token, eos_token_id), next_token
             )
 
-            output_ids = torch.cat([output_ids, next_token], dim=-1)
+            input_ids = torch.cat([input_ids, next_token], dim=-1)
 
             # === 修复 position_ids 更新逻辑 ===
             next_position = position_ids[:, -1:] + 1
             position_ids = torch.cat([position_ids, next_position], dim=1)
 
-            if is_beacon is not None:
-                pad_beacon = torch.zeros((batch_size, 1), dtype=torch.bool, device=device)
-                is_beacon = torch.cat([is_beacon, pad_beacon], dim=1)
-
-            attention_mask = self.expand_attention_mask(attention_mask)
-            # past_key_values = outputs.past_key_values
+            attention_mask = torch.cat([attention_mask, torch.ones((batch_size, 1), dtype=torch.long, device=device)], dim=1)
+            past_key_values = outputs.past_key_values
 
             stopped |= next_token.squeeze(1) == eos_token_id
             if stopped.all():
                 break
 
-        return output_ids
+        return input_ids

@@ -116,24 +116,34 @@ if __name__ == "__main__":
             processed_sample = preprocessor(sample)
             samples.append(processed_sample)
         samples = [data_collator([sample]) for sample in samples]
-        print(len(samples))
         for idx, sample in tqdm(enumerate(samples)):
             input_ids = sample['input_ids'].to('cuda')
             attention_mask = sample['attention_mask'].to('cuda')
             position_ids = sample['position_ids'].to('cuda')
+            question_ids = sample['question_ids'].to('cuda')
             is_beacon = sample['is_beacon'].to('cuda')
             # print("input_ids shape: ", input_ids.shape)
             # print("attention_mask shape: ", attention_mask.shape)
             # print("position_ids shape: ", position_ids.shape)
             # print("is_beacon shape: ", is_beacon.shape)
-            output_ids = model.generate(
+            input_ids, attention_mask, position_ids, past_key_values = model.construct_inputs_for_generation(
                 input_ids = input_ids,
                 attention_mask = attention_mask,
                 position_ids = position_ids,
-                is_beacon = is_beacon,
-                max_new_tokens = 8000
+                question_ids = question_ids,
+                is_beacon = is_beacon
             )
-            generated_texts = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+            inputs = {
+                "input_ids": input_ids,
+                "attention_mask": attention_mask,
+                "position_ids": position_ids,
+                "past_key_values": past_key_values,
+            }
+            output_ids = model.generate(
+                **inputs,
+                max_new_tokens = 8000,
+            )
+            generated_texts = tokenizer.decode(output_ids[0][len(input_ids[0]):], skip_special_tokens=True)
             print(f"{idx}: generated: {generated_texts}, answer: {lines[idx]['answer']}")
             lines[idx]['prediction'] = generated_texts
             lines[idx]['model_name'] = model_name

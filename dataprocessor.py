@@ -236,9 +236,6 @@ class SamplePreprocessor:
 
         # question
         question_ids = self.tokenizer.encode(question, add_special_tokens=False)
-        input_ids.extend(question_ids)
-        segment_ids.extend([0] * len(question_ids))
-        is_beacon.extend([0] * len(question_ids))
 
         # labels
         label_ids = self.tokenizer.encode(answer, add_special_tokens=False)
@@ -250,6 +247,7 @@ class SamplePreprocessor:
         sample['input_ids'] = input_ids
         sample['segment_ids'] = segment_ids
         sample['is_beacon'] = is_beacon
+        sample['question_ids'] = question_ids
         sample['label_ids'] = label_ids
         return sample
     
@@ -350,6 +348,7 @@ class CHADataCollator:
         is_beacon = torch.tensor(sample['is_beacon'], dtype=torch.bool).unsqueeze(0)  # (1, L)
         attention_mask = self.make_segment_mask(segment_ids, is_beacon).unsqueeze(0)  # (1, L, L)
         position_ids = torch.arange(input_ids.shape[1], dtype=torch.long).unsqueeze(0)
+        question_ids = torch.LongTensor(sample.get('question_ids', [])).unsqueeze(0)  # (1, L)
         label_ids = torch.LongTensor(sample['label_ids']).unsqueeze(0)  # (1, L)
         # print(f"Input IDs shape: {input_ids.shape}, Attention mask shape: {attention_mask.shape}, Position IDs shape: {position_ids.shape}, Label IDs shape: {label_ids.shape}, Is beacon shape: {is_beacon.shape}")
 
@@ -357,8 +356,9 @@ class CHADataCollator:
             'input_ids': input_ids,
             'attention_mask': attention_mask,
             'position_ids': position_ids,
+            'question_ids': question_ids,
             'label_ids': label_ids,
-            "is_beacon": is_beacon,
+            'is_beacon': is_beacon,
         })
 
 # class CompressionStrategy:
