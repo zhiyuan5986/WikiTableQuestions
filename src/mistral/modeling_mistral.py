@@ -514,3 +514,116 @@ class MistralForCausalLMWithBeacon(MistralForCausalLM):
         return model
     
     # def generate(self, )
+
+    def expand_attention_mask(self, attn_mask: torch.Tensor) -> torch.Tensor:
+        """
+        Given (B, 1, T, T) attention_mask, expand to (B, 1, T+1, T+1)
+        by copying the last row/column and appending one new position.
+        """
+        B, _, T, _ = attn_mask.shape
+        device = attn_mask.device
+
+        # Expand along sequence dimension
+        new_mask = torch.zeros(B, 1, T + 1, T + 1, device=device, dtype=attn_mask.dtype)
+
+        # Copy existing mask
+        new_mask[:, :, :T, :T] = attn_mask
+
+        # Copy last row → new row
+        new_mask[:, :, T, :T] = attn_mask[:, :, T - 1, :]
+
+        # Copy last column → new column
+        new_mask[:, :, :T, T] = attn_mask[:, :, :, T - 1]
+
+        # Make self visible (causal)
+        new_mask[:, :, T, T] = attn_mask[:, :, T - 1, T - 1]
+
+        return new_mask
+
+    @torch.no_grad()
+    def generate(
+        self,
+        input_ids: torch.LongTensor,
+        attention_mask: torch.Tensor,
+        position_ids: torch.LongTensor,
+        max_new_tokens: int,
+        is_beacon: Optional[torch.BoolTensor] = None,
+        eos_token_id: Optional[int] = None,
+    ) -> torch.LongTensor:
+        self.eval()
+        device = input_ids.device
+        batch_size = input_ids.size(0)
+        output_ids = input_ids.clone()
+        # past_key_values = None
+
+        if is_beacon is not None:
+            assert is_beacon.shape == input_ids.shape
+
+        stopped = torch.zeros(batch_size, dtype=torch.bool, device=device)
+        eos_token_id = eos_token_id if eos_token_id is not None else self.config.eos_token_id
+
+        for step in range(max_new_tokens):
+            # no cache
+            cur_input_ids = output_ids
+            cur_position_ids = position_ids
+            cur_is_beacon = is_beacon
+
+            # print("current input_ids: ", cur_input_ids)
+            # print("attention_mask: ", attention_mask)
+            # print("current position_ids: ", position_ids)
+            # print("current is_beacon: ", cur_is_beacon)
+            outputs = self(
+                input_ids=cur_input_ids,
+                attention_mask=attention_mask,
+                position_ids=cur_position_ids,
+                # past_key_values=past_key_values,
+                # use_cache=True,
+                is_beacon=cur_is_beacon,
+            )
+
+            # with cache
+            # cur_input_ids = output_ids[:, -1:] if step > 0 else output_ids
+            # cur_position_ids = position_ids[:, -1:] if step > 0 else position_ids
+            # cur_is_beacon = is_beacon[:, -1:] if (step > 0 and is_beacon is not None) else is_beacon
+
+            # # print("current input_ids: ", cur_input_ids)
+            # # print("attention_mask: ", attention_mask)
+            # # print("current position_ids: ", position_ids)
+            # # print("current is_beacon: ", cur_is_beacon)
+            # outputs = self(
+            #     input_ids=cur_input_ids,
+            #     attention_mask=attention_mask,
+            #     position_ids=cur_position_ids,
+            #     past_key_values=past_key_values,
+            #     use_cache=True,
+            #     is_beacon=cur_is_beacon,
+            # )
+
+            # print("Step:", step)
+
+            logits = outputs.logits[:, -1, :]
+            next_token = torch.argmax(logits, dim=-1, keepdim=True)
+
+            # 替换已终止位置
+            next_token = torch.where(
+                stopped.unsqueeze(1), torch.full_like(next_token, eos_token_id), next_token
+            )
+
+            output_ids = torch.cat([output_ids, next_token], dim=-1)
+
+            # === 修复 position_ids 更新逻辑 ===
+            next_position = position_ids[:, -1:] + 1
+            position_ids = torch.cat([position_ids, next_position], dim=1)
+
+            if is_beacon is not None:
+                pad_beacon = torch.zeros((batch_size, 1), dtype=torch.bool, device=device)
+                is_beacon = torch.cat([is_beacon, pad_beacon], dim=1)
+
+            attention_mask = self.expand_attention_mask(attention_mask)
+            # past_key_values = outputs.past_key_values
+
+            stopped |= next_token.squeeze(1) == eos_token_id
+            if stopped.all():
+                break
+
+        return output_ids

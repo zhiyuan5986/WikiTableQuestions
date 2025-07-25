@@ -196,6 +196,84 @@ class SamplePreprocessorForFinetune:
             row_segment_ids.extend([row_idx] * len(cell_ids))
         return row_input_ids, row_segment_ids, row_is_beacon
 
+class SamplePreprocessor:
+    def __init__(
+        self,
+        tokenizer,
+        beacon_size: int = 1,
+    ):
+        self.tokenizer = tokenizer
+        self.beacon_size = beacon_size
+        self.beacon_token = self.tokenizer.eos_token
+        self.beacon_token_id = self.tokenizer.convert_tokens_to_ids(self.beacon_token)
+
+    def __call__(self, sample, **kwargs):
+
+        df = sample['df']
+        qtype = sample['qtype']
+        qsubtype = sample['qsubtype']
+        instruction_type = sample['instruction_type']
+        instruction = INSTRUCTION_MAP[instruction_type]
+        question = f"```\n\nLet's get start!\nQuestion: {sample['question']}\n"
+        answer = sample['answer']
+
+        df_aug = df.map(lambda x: str(x) + self.beacon_token * self.beacon_size)
+        rows = df_aug.values.tolist()
+
+        # instruction
+        input_ids = self.tokenizer.encode(instruction, add_special_tokens=False)
+        header_ids = self.tokenizer.encode(','.join(df.columns.to_list())+"\n", add_special_tokens=False)
+        input_ids.extend(header_ids)
+        segment_ids = [0] * len(input_ids)
+        is_beacon = [0] * len(input_ids)
+
+        # table
+        for row_idx, row in enumerate(rows):
+            row_input_ids, row_segment_ids, row_is_beacon = self.tokenize_row(row, row_idx)
+            input_ids.extend(row_input_ids)
+            segment_ids.extend(row_segment_ids)
+            is_beacon.extend(row_is_beacon)
+
+        # question
+        question_ids = self.tokenizer.encode(question, add_special_tokens=False)
+        input_ids.extend(question_ids)
+        segment_ids.extend([0] * len(question_ids))
+        is_beacon.extend([0] * len(question_ids))
+
+        # labels
+        label_ids = self.tokenizer.encode(answer, add_special_tokens=False)
+        # input_ids.extend(label_ids)
+        # segment_ids.extend([0] * len(label_ids))
+        # is_beacon.extend([0] * len(label_ids))
+
+        del sample['df']
+        sample['input_ids'] = input_ids
+        sample['segment_ids'] = segment_ids
+        sample['is_beacon'] = is_beacon
+        sample['label_ids'] = label_ids
+        return sample
+    
+    def tokenize_row(self, row, row_idx):
+        """
+        Tokenize a single row of the DataFrame.
+        """
+        row_input_ids = []
+        row_segment_ids = []
+        row_is_beacon = []
+        for idx, cell in enumerate(row):
+            # Tokenize each cell, add a comma if not the last cell
+            if idx == len(row) - 1:
+                cell_text = str(cell) + ","
+                cell_ids = self.tokenizer.encode(cell_text, add_special_tokens=False)
+                row_is_beacon.extend([0] * (len(cell_ids) - 1 - self.beacon_size) + [1] * self.beacon_size + [0])
+            else:
+                cell_text = str(cell)
+                cell_ids = self.tokenizer.encode(cell_text, add_special_tokens=False)
+                row_is_beacon.extend([0] * (len(cell_ids) - self.beacon_size) + [1] * self.beacon_size)
+            row_input_ids.extend(cell_ids)
+            row_segment_ids.extend([row_idx] * len(cell_ids))
+        return row_input_ids, row_segment_ids, row_is_beacon
+
 class CHADataCollator:
 
     def make_segment_mask(self, segment_ids: torch.Tensor, is_beacon: torch.Tensor, dtype=torch.bfloat16) -> torch.Tensor:
@@ -269,9 +347,9 @@ class CHADataCollator:
         
         input_ids = torch.LongTensor(sample['input_ids']).unsqueeze(0)
         segment_ids = torch.LongTensor(sample['segment_ids']).unsqueeze(0)  # (1, L)
-        is_beacon = torch.LongTensor(sample['is_beacon']).unsqueeze(0)  # (1, L)
+        is_beacon = torch.tensor(sample['is_beacon'], dtype=torch.bool).unsqueeze(0)  # (1, L)
         attention_mask = self.make_segment_mask(segment_ids, is_beacon).unsqueeze(0)  # (1, L, L)
-        position_ids = torch.arange(input_ids.shape[1], dtype=torch.int64).unsqueeze(0)
+        position_ids = torch.arange(input_ids.shape[1], dtype=torch.long).unsqueeze(0)
         label_ids = torch.LongTensor(sample['label_ids']).unsqueeze(0)  # (1, L)
         # print(f"Input IDs shape: {input_ids.shape}, Attention mask shape: {attention_mask.shape}, Position IDs shape: {position_ids.shape}, Label IDs shape: {label_ids.shape}, Is beacon shape: {is_beacon.shape}")
 

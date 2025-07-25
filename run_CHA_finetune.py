@@ -38,7 +38,7 @@ if __name__ == "__main__":
         raise ValueError("Unsupported model name. Please use a model from Llama, Qwen, or Mistral.")
     local_rank = str(os.environ.get("LOCAL_RANK", 0))
     if training_args.overwrite_output_dir or not os.path.exists(training_args.output_dir):
-        training_args.output_dir = training_args.output_dir + f"-{model_name}" + "-gradient" + str(training_args.gradient_accumulation_steps) + "-time" + datetime.datetime.now().strftime("%Y%m%d%H%M%S") + "-localrank" + local_rank
+        training_args.output_dir = training_args.output_dir + f"-{model_name}" + "-gradient" + str(training_args.gradient_accumulation_steps) + "-epochs" + str(training_args.num_train_epochs) + "-time" + datetime.datetime.now().strftime("%Y%m%d%H%M%S") + "-localrank" + local_rank
     training_args.run_name = training_args.output_dir.split('/')[-1]
 
     # import wandb
