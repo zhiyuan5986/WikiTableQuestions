@@ -127,7 +127,34 @@ class SamplePreprocessorForFinetune:
         # self.dataset_type = dataset_type
         # if dataset_type.upper() not in dir(DatasetType):
         #     raise ValueError(f"Unsupported dataset type: {dataset_type}")
+        self.post_init()
+    
+    def post_init(self):
+        if hasattr(self.tokenizer, "chat_template") and self.tokenizer.chat_template:
+            dummy_messages = [{"role": "user", "content": "DUMMY_INPUT"}]
+            full_template = self.tokenizer.apply_chat_template(
+                dummy_messages,
+                tokenize=False,
+                add_generation_prompt=True
+            )
+            prefix_text, postfix_text = full_template.split("DUMMY_INPUT")
 
+        # ==== 情况 2：无模板，使用vicuna默认格式 ====
+        else:
+            prefix_text = "A chat between a curious user and an artificial intelligence assistant. " \
+                        + "The assistant gives helpful, detailed, and polite answers to the user's questions.\n\n" \
+                        + "USER: "
+            postfix_text = "\nASSISTANT:"
+        
+        prefix_ids = self.tokenizer.encode(prefix_text)
+        postfix_ids = self.tokenizer.encode(postfix_text)
+        
+        print("********** SamplePreprocessor post init **********")
+        print("prefix text: ", prefix_text)
+        print("postfix text: ", postfix_text)
+
+        self.prefix_ids = prefix_ids
+        self.postfix_ids = postfix_ids
 
     def __call__(self, sample, **kwargs):
 
@@ -142,8 +169,11 @@ class SamplePreprocessorForFinetune:
         df_aug = df.map(lambda x: str(x) + self.beacon_token * self.beacon_size)
         rows = df_aug.values.tolist()
 
+        # prefix
+        input_ids = self.prefix_ids
+
         # instruction
-        input_ids = self.tokenizer.encode(instruction, add_special_tokens=False)
+        input_ids.extend(self.tokenizer.encode(instruction, add_special_tokens=False))
         header_ids = self.tokenizer.encode(','.join(df.columns.to_list())+"\n", add_special_tokens=False)
         input_ids.extend(header_ids)
         segment_ids = [0] * len(input_ids)
@@ -156,8 +186,8 @@ class SamplePreprocessorForFinetune:
             segment_ids.extend(row_segment_ids)
             is_beacon.extend(row_is_beacon)
 
-        # question
-        question_ids = self.tokenizer.encode(question, add_special_tokens=False)
+        # question + postfix
+        question_ids = self.tokenizer.encode(question, add_special_tokens=False) + self.postfix_ids
         input_ids.extend(question_ids)
         segment_ids.extend([0] * len(question_ids))
         is_beacon.extend([0] * len(question_ids))
@@ -206,6 +236,34 @@ class SamplePreprocessor:
         self.beacon_size = beacon_size
         self.beacon_token = self.tokenizer.eos_token
         self.beacon_token_id = self.tokenizer.convert_tokens_to_ids(self.beacon_token)
+        self.post_init()
+    
+    def post_init(self):
+        if hasattr(self.tokenizer, "chat_template") and self.tokenizer.chat_template:
+            dummy_messages = [{"role": "user", "content": "DUMMY_INPUT"}]
+            full_template = self.tokenizer.apply_chat_template(
+                dummy_messages,
+                tokenize=False,
+                add_generation_prompt=True
+            )
+            prefix_text, postfix_text = full_template.split("DUMMY_INPUT")
+
+        # ==== 情况 2：无模板，使用vicuna默认格式 ====
+        else:
+            prefix_text = "A chat between a curious user and an artificial intelligence assistant. " \
+                        + "The assistant gives helpful, detailed, and polite answers to the user's questions.\n\n" \
+                        + "USER: "
+            postfix_text = "\nASSISTANT:"
+        
+        prefix_ids = self.tokenizer.encode(prefix_text)
+        postfix_ids = self.tokenizer.encode(postfix_text)
+        
+        print("********** SamplePreprocessor post init **********")
+        print("prefix text: ", prefix_text)
+        print("postfix text: ", postfix_text)
+        
+        self.prefix_ids = prefix_ids
+        self.postfix_ids = postfix_ids
 
     def __call__(self, sample, **kwargs):
 
@@ -220,8 +278,11 @@ class SamplePreprocessor:
         df_aug = df.map(lambda x: str(x) + self.beacon_token * self.beacon_size)
         rows = df_aug.values.tolist()
 
+        # prefix
+        input_ids = self.prefix_ids
+
         # instruction
-        input_ids = self.tokenizer.encode(instruction, add_special_tokens=False)
+        input_ids.extend(self.tokenizer.encode(instruction, add_special_tokens=False))
         header_ids = self.tokenizer.encode(','.join(df.columns.to_list())+"\n", add_special_tokens=False)
         input_ids.extend(header_ids)
         segment_ids = [0] * len(input_ids)
@@ -234,8 +295,8 @@ class SamplePreprocessor:
             segment_ids.extend(row_segment_ids)
             is_beacon.extend(row_is_beacon)
 
-        # question
-        question_ids = self.tokenizer.encode(question, add_special_tokens=False)
+        # question + postfix
+        question_ids = self.tokenizer.encode(question, add_special_tokens=False) + self.postfix_ids
 
         # labels
         label_ids = self.tokenizer.encode(answer, add_special_tokens=False)
