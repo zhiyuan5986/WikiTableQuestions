@@ -282,7 +282,8 @@ class SamplePreprocessor:
         rows = df_aug.values.tolist()
 
         # prefix
-        input_ids = self.prefix_ids
+        input_ids = []
+        input_ids.extend(self.prefix_ids)
 
         # instruction
         input_ids.extend(self.tokenizer.encode(instruction, add_special_tokens=False))
