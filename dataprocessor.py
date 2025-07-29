@@ -152,6 +152,8 @@ class SamplePreprocessorForFinetune:
         print("********** SamplePreprocessor post init **********")
         print("prefix text: ", prefix_text)
         print("postfix text: ", postfix_text)
+        print("prefix ids: ", prefix_ids)
+        print("postfix ids: ", postfix_ids)
 
         self.prefix_ids = prefix_ids
         self.postfix_ids = postfix_ids
@@ -170,7 +172,8 @@ class SamplePreprocessorForFinetune:
         rows = df_aug.values.tolist()
 
         # prefix
-        input_ids = self.prefix_ids
+        input_ids = []
+        input_ids.extend(self.prefix_ids)
 
         # instruction
         input_ids.extend(self.tokenizer.encode(instruction, add_special_tokens=False))
