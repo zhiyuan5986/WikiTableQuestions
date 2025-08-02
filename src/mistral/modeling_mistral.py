@@ -666,6 +666,68 @@ class MistralForCausalLMWithBeacon(MistralForCausalLM):
         position_ids = torch.arange(old_length, old_length + question_ids.size(1), device=input_ids.device).unsqueeze(0)
         return input_ids, attention_mask, position_ids, past_key_values
 
+    # @torch.no_grad()
+    # def generate(
+    #     self,
+    #     input_ids: torch.LongTensor,
+    #     attention_mask: torch.Tensor,
+    #     position_ids: torch.LongTensor,
+    #     past_key_values: Optional[Union[Cache, List[torch.FloatTensor]]] = None,
+    #     max_new_tokens: int = 8000,
+    #     eos_token_id: Optional[int] = None,
+    # ) -> torch.LongTensor:
+
+    #     self.eval()
+    #     device = input_ids.device
+    #     batch_size = input_ids.size(0)
+
+
+    #     stopped = torch.zeros(batch_size, dtype=torch.bool, device=device)
+    #     eos_token_id = eos_token_id if eos_token_id is not None else self.config.eos_token_id
+
+    #     for step in range(max_new_tokens):
+
+    #         # with cache
+    #         cur_input_ids = input_ids[:, -1:] if step > 0 else input_ids
+    #         cur_position_ids = position_ids[:, -1:] if step > 0 else position_ids
+
+    #         # print("current input_ids: ", cur_input_ids)
+    #         # print("attention_mask: ", attention_mask)
+    #         # print("current position_ids: ", position_ids)
+    #         # print("current is_beacon: ", cur_is_beacon)
+    #         outputs = self(
+    #             input_ids=cur_input_ids,
+    #             attention_mask=attention_mask,
+    #             position_ids=cur_position_ids,
+    #             past_key_values=past_key_values,
+    #             use_cache=True,
+    #         )
+
+    #         # print("Step:", step)
+
+    #         logits = outputs.logits[:, -1, :]
+    #         next_token = torch.argmax(logits, dim=-1, keepdim=True)
+
+    #         # 替换已终止位置
+    #         next_token = torch.where(
+    #             stopped.unsqueeze(1), torch.full_like(next_token, eos_token_id), next_token
+    #         )
+
+    #         input_ids = torch.cat([input_ids, next_token], dim=-1)
+
+    #         # === 修复 position_ids 更新逻辑 ===
+    #         next_position = position_ids[:, -1:] + 1
+    #         position_ids = torch.cat([position_ids, next_position], dim=1)
+
+    #         attention_mask = torch.cat([attention_mask, torch.ones((batch_size, 1), dtype=torch.long, device=device)], dim=1)
+    #         past_key_values = outputs.past_key_values
+
+    #         stopped |= next_token.squeeze(1) == eos_token_id
+    #         if stopped.all():
+    #             break
+
+    #     return input_ids
+
     @torch.no_grad()
     def generate(
         self,
@@ -676,25 +738,19 @@ class MistralForCausalLMWithBeacon(MistralForCausalLM):
         max_new_tokens: int = 8000,
         eos_token_id: Optional[int] = None,
     ) -> torch.LongTensor:
-
         self.eval()
         device = input_ids.device
-        batch_size = input_ids.size(0)
+        assert input_ids.size(0) == 1, "Only batch size = 1 is supported."
 
-
-        stopped = torch.zeros(batch_size, dtype=torch.bool, device=device)
         eos_token_id = eos_token_id if eos_token_id is not None else self.config.eos_token_id
+        if not isinstance(eos_token_id, list):
+            eos_token_id = [eos_token_id]
 
         for step in range(max_new_tokens):
-
-            # with cache
+            # 只取当前 token 作为输入
             cur_input_ids = input_ids[:, -1:] if step > 0 else input_ids
             cur_position_ids = position_ids[:, -1:] if step > 0 else position_ids
 
-            # print("current input_ids: ", cur_input_ids)
-            # print("attention_mask: ", attention_mask)
-            # print("current position_ids: ", position_ids)
-            # print("current is_beacon: ", cur_is_beacon)
             outputs = self(
                 input_ids=cur_input_ids,
                 attention_mask=attention_mask,
@@ -703,27 +759,22 @@ class MistralForCausalLMWithBeacon(MistralForCausalLM):
                 use_cache=True,
             )
 
-            # print("Step:", step)
-
-            logits = outputs.logits[:, -1, :]
-            next_token = torch.argmax(logits, dim=-1, keepdim=True)
-
-            # 替换已终止位置
-            next_token = torch.where(
-                stopped.unsqueeze(1), torch.full_like(next_token, eos_token_id), next_token
-            )
+            logits = outputs.logits[:, -1, :]  # (1, vocab_size)
+            next_token = torch.argmax(logits, dim=-1, keepdim=True)  # (1, 1)
 
             input_ids = torch.cat([input_ids, next_token], dim=-1)
 
-            # === 修复 position_ids 更新逻辑 ===
+            if next_token.item() in eos_token_id:
+                break
+
+            # 更新 position_ids、attention_mask、past_key_values
             next_position = position_ids[:, -1:] + 1
             position_ids = torch.cat([position_ids, next_position], dim=1)
 
-            attention_mask = torch.cat([attention_mask, torch.ones((batch_size, 1), dtype=torch.long, device=device)], dim=1)
+            attention_mask = torch.cat(
+                [attention_mask, torch.ones((1, 1), dtype=torch.long, device=device)],
+                dim=1,
+            )
             past_key_values = outputs.past_key_values
-
-            stopped |= next_token.squeeze(1) == eos_token_id
-            if stopped.all():
-                break
 
         return input_ids

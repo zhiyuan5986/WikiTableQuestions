@@ -7,11 +7,17 @@ import random
 from munch import Munch
 import pandas as pd
 
+# INSTRUCTIONS = [
+#     "Please provide a reinterpretation of the preceding table. \n[TABLE]\n```\n",
+#     "Could you give me a different version of the table above? \n[TABLE]\n```\n",
+#     "After uppacking the table above, we got: \n[TABLE]\n```\n",
+#     "Please offer a restatement of the table I've just read. \n[TABLE]\n```\n"
+# ]
 INSTRUCTIONS = [
-    "Please provide a reinterpretation of the preceding table. \n[TABLE]\n```\n",
-    "Could you give me a different version of the table above? \n[TABLE]\n```\n",
-    "After uppacking the table above, we got: \n[TABLE]\n```\n",
-    "Please offer a restatement of the table I've just read. \n[TABLE]\n```\n"
+    "Please provide a reinterpretation of the preceding table.\n",
+    "Could you give me a different version of the table above?\n",
+    "After uppacking the table above, we got:\n",
+    "Please offer a restatement of the table I've just read.\n"
 ]
 class SamplePreprocessorForPretrain:
     def __init__(
@@ -25,12 +31,46 @@ class SamplePreprocessorForPretrain:
         self.max_length = max_length
         self.beacon_token = self.tokenizer.eos_token
         self.beacon_token_id = self.tokenizer.convert_tokens_to_ids(self.beacon_token)
+        if isinstance(self.tokenizer.eos_token_id, list):
+            self.eos_token_id = self.tokenizer.eos_token_id[0]
+        else:
+            self.eos_token_id = self.tokenizer.eos_token_id
+        # print("eos token id: ", self.eos_token_id)
 
         # self.max_length = max_length
         # self.dataset_type = dataset_type
         # if dataset_type.upper() not in dir(DatasetType):
         #     raise ValueError(f"Unsupported dataset type: {dataset_type}")
+        self.post_init()
+    
+    def post_init(self):
+        if hasattr(self.tokenizer, "chat_template") and self.tokenizer.chat_template:
+            dummy_messages = [{"role": "user", "content": "DUMMY_INPUT"}]
+            full_template = self.tokenizer.apply_chat_template(
+                dummy_messages,
+                tokenize=False,
+                add_generation_prompt=True
+            )
+            prefix_text, postfix_text = full_template.split("DUMMY_INPUT")
 
+        # ==== 情况 2：无模板，使用vicuna默认格式 ====
+        else:
+            prefix_text = "A chat between a curious user and an artificial intelligence assistant. " \
+                        + "The assistant gives helpful, detailed, and polite answers to the user's questions.\n\n" \
+                        + "USER: "
+            postfix_text = "\nASSISTANT:"
+        
+        prefix_ids = self.tokenizer.encode(prefix_text)
+        postfix_ids = self.tokenizer.encode(postfix_text)
+        
+        print("********** SamplePreprocessor post init **********")
+        print("prefix text: ", prefix_text)
+        print("postfix text: ", postfix_text)
+        print("prefix ids: ", prefix_ids)
+        print("postfix ids: ", postfix_ids)
+
+        self.prefix_ids = prefix_ids
+        self.postfix_ids = postfix_ids
 
     def __call__(self, sample, **kwargs):
 
@@ -40,7 +80,9 @@ class SamplePreprocessorForPretrain:
         rows = df_aug.values.tolist()
 
         # prefix + header
-        input_ids = self.tokenizer.encode("[TABLE]\n```\n", add_special_tokens=False)
+        input_ids = []
+        input_ids.extend(self.prefix_ids)
+        input_ids.extend(self.tokenizer.encode("[TABLE]\n```\n", add_special_tokens=False))
         header_ids = self.tokenizer.encode(','.join(df.columns.to_list())+"\n", add_special_tokens=False)
         input_ids.extend(header_ids)
         segment_ids = [0] * len(input_ids)
@@ -60,14 +102,15 @@ class SamplePreprocessorForPretrain:
             row_nums += 1
 
         # postfix
-        postfix_ids = self.tokenizer.encode("```\n" + random.choice(INSTRUCTIONS), add_special_tokens=False)
+        postfix_ids = self.tokenizer.encode("```\n" + random.choice(INSTRUCTIONS), add_special_tokens=False) + self.postfix_ids
         input_ids.extend(postfix_ids)
         segment_ids.extend([0] * len(postfix_ids))
         is_beacon.extend([0] * len(postfix_ids))
 
         # labels
         labels = df.iloc[:row_nums].to_csv(index=False, header=True)
-        label_ids = self.tokenizer.encode(labels, add_special_tokens=False)
+        # print("eos token id: ", self.eos_token_id)
+        label_ids = self.tokenizer.encode(labels, add_special_tokens=False) + [self.eos_token_id]
         input_ids.extend(label_ids)
         segment_ids.extend([0] * len(label_ids))
         is_beacon.extend([0] * len(label_ids))
@@ -122,6 +165,10 @@ class SamplePreprocessorForFinetune:
         self.max_length = max_length
         self.beacon_token = self.tokenizer.eos_token
         self.beacon_token_id = self.tokenizer.convert_tokens_to_ids(self.beacon_token)
+        if isinstance(self.tokenizer.eos_token_id, list):
+            self.eos_token_id = self.tokenizer.eos_token_id[0]
+        else:
+            self.eos_token_id = self.tokenizer.eos_token_id
 
         # self.max_length = max_length
         # self.dataset_type = dataset_type
@@ -196,7 +243,12 @@ class SamplePreprocessorForFinetune:
         is_beacon.extend([0] * len(question_ids))
 
         # labels
-        label_ids = self.tokenizer.encode(answer, add_special_tokens=False)[:self.max_length]
+        label_ids = self.tokenizer.encode(answer, add_special_tokens=False)
+        if len(label_ids) > self.max_length:
+            label_ids = label_ids[:self.max_length]
+        else:
+            label_ids.append(self.eos_token_id)
+
         input_ids.extend(label_ids)
         segment_ids.extend([0] * len(label_ids))
         is_beacon.extend([0] * len(label_ids))
