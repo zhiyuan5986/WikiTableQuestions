@@ -73,21 +73,21 @@ if __name__ == "__main__":
     parser = HfArgumentParser(InferArguments)
     (args,) = parser.parse_args_into_dataclasses()
 
-    # if "llama" in args.model_name_or_path.lower():
-    #     model_name = "llama"
-    # elif "qwen" in args.model_name_or_path.lower():
-    #     model_name = "qwen"
-    # elif "mistral" in args.model_name_or_path.lower():
-    #     model_name = "mistral"
-    # elif "deepseek" in args.model_name_or_path.lower():
-    #     model_name = "deepseek"
-    # else:
-    #     raise ValueError("Unsupported model name. Please use a model from Llama, Qwen, or Mistral.")
-    model_name = args.model_name_or_path.split('/')[-1] if args.model_name_or_path else "unknown"
+    if "llama" in args.model_name_or_path.lower():
+        model_name = "llama"
+    elif "qwen" in args.model_name_or_path.lower():
+        model_name = "qwen"
+    elif "mistral" in args.model_name_or_path.lower():
+        model_name = "mistral"
+    elif "deepseek" in args.model_name_or_path.lower():
+        model_name = "deepseek"
+    else:
+        raise ValueError("Unsupported model name. Please use a model from Llama, Qwen, or Mistral.")
 
     print("Model name:", model_name)
 
     model, tokenizer = load_model_and_tokenizer(model_args=args, model_name=model_name)
+    model_name = args.model_name_or_path.split('/')[-1] if args.model_name_or_path else "unknown"
     model = model.cuda()
     model.eval()
 
