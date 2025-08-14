@@ -147,22 +147,28 @@ class SamplePreprocessorForPretrain:
             row_segment_ids.extend([row_idx] * len(cell_ids))
         return row_input_ids, row_segment_ids, row_is_beacon
 
-# INSTRUCTION_MAP = {
-#     "DP": "You are a table analyst. Your task is to answer questions based on the table content.\n\n\nThe answer should follow the format below:\n[Answer Format]\nFinal Answer: AnswerName1, AnswerName2...\n\nEnsure the final answer format is the last output line and can only be in the 'Final Answer: AnswerName1, AnswerName2...' form, no other form. Ensure the 'AnswerName' is a number or entity name, as short as possible, without any explanation.\n\n\nGive the final answer to the question directly without any explanation.\n\nRead the table below in CSV format:\n[TABLE]\n```\n",
-#     "SCoT": "You are a table analyst. Your task is to utilize the Python package 'pandas' to analyze the table and then answer questions.\n[Guidelines]\nYou should act in following patterns step by step to analyze the table and then give the final answer:\n[Action Patterns]\nThought: You should always think about what to do to interact with Python code base on Result\nAction: the action can **ONLY** be single line python code\nResult: Simulate the result of the execution of the python code in Action, analyse that result and decide whether to continue or not\n(This thought/Action/Result can repeat N times)\n\n\nWhen you think the actions are enough to achieve the final answer, give the conclusion following the format below:\n[Answer Format]\nConclusion: After analyzing the table,I am confident that ...\bFinal Answer: AnswerName1, AnswerName2...\n\nEnsure the final answer format is the last output line and can only be in the 'Final Answer: AnswerName1, AnswerName2...' form, no other form. Ensure the 'AnswerName' is a number or entity name, as short as possible, without any explanation.\n\n\nLet's think step by step and then give the final answer to the question.\nEnsure to have a concluding thought that verifies the table, observations and the question before giving the final answer.\nRead the table below in CSV format:\n[TABLE]\n```\n",
-#     "TCoT": "You are a table analyst. Your task is to answer questions based on the table content.\n\n\nThe answer should follow the format below:\n[Answer Format]\nFinal Answer: AnswerName1, AnswerName2...\n\nEnsure the final answer format is the last output line and can only be in the 'Final Answer: AnswerName1, AnswerName2...' form, no other form. Ensure the 'AnswerName' is a number or entity name, as short as possible, without any explanation.\n\n\nLet's think step by step and then give the final answer to the question.\n\nRead the table below in CSV format:\n[TABLE]\n```\n",
-#     "PoT": "You are a data analyst proficient in Python. Your task is to write executable Python code to analyze the table and then answer questions.\n[Guidelines]\nYou should act following requirements below:\n1. based on the question, write out your analytical approach, and then write Python code according to this approach.\n2. The code needs to be concise and easy to understand, and if necessary, add comments for clarification.\n3. Code blocks need to strictly start with ```python and end with ```\n4. Your analysis must be based entirely on the above data. If the user's question is not related to data analysis, please politely refuse.\n5. You need to generate executable code. If there are results to be presented, please use the print function; if there are charts, please use the matplotlib library to draw them.\n6. Ensure to load the table with command ```df = pd.read_csv('table.csv')```\n\n\nThe generated Python code should follow the format below, and ensure the first two code lines is exactly the same with the following code block:\n[Python Code Format]\n```python\nimport pandas as pd\ndf = pd.read_csv('table.csv')\n...\nprint(f'Final Answer: {{answer}}')\n```\n\nEnsure the final answer is the last line in python code and can only be in the 'print(f'Final Answer: {{answer}}')' form, no other from. Ensure variable 'answer' can only be 'AnswerName1, AnswerName2...' form, no other form, and 'AnswerName' can only be a number or entity name, as short as possible, without any explanation.\n\n\nLet's think step by step and then generate python code to analyze table and present the final answer to the question.\n\nRead the table below in CSV format:\n[TABLE]\n```\n"
-# }
+INSTRUCTION_MAP = {
+    "DP": "You are a table analyst. Your task is to answer questions based on the table content.\n\n\nThe answer should follow the format below:\n[Answer Format]\nFinal Answer: AnswerName1, AnswerName2...\n\nEnsure the final answer format is the last output line and can only be in the 'Final Answer: AnswerName1, AnswerName2...' form, no other form. Ensure the 'AnswerName' is a number or entity name, as short as possible, without any explanation.\n\n\nGive the final answer to the question directly without any explanation.\n\nRead the table below in CSV format:\n[TABLE]\n```\n",
+    "SCoT": "You are a table analyst. Your task is to utilize the Python package 'pandas' to analyze the table and then answer questions.\n[Guidelines]\nYou should act in following patterns step by step to analyze the table and then give the final answer:\n[Action Patterns]\nThought: You should always think about what to do to interact with Python code base on Result\nAction: the action can **ONLY** be single line python code\nResult: Simulate the result of the execution of the python code in Action, analyse that result and decide whether to continue or not\n(This thought/Action/Result can repeat N times)\n\n\nWhen you think the actions are enough to achieve the final answer, give the conclusion following the format below:\n[Answer Format]\nConclusion: After analyzing the table,I am confident that ...\bFinal Answer: AnswerName1, AnswerName2...\n\nEnsure the final answer format is the last output line and can only be in the 'Final Answer: AnswerName1, AnswerName2...' form, no other form. Ensure the 'AnswerName' is a number or entity name, as short as possible, without any explanation.\n\n\nLet's think step by step and then give the final answer to the question.\nEnsure to have a concluding thought that verifies the table, observations and the question before giving the final answer.\nRead the table below in CSV format:\n[TABLE]\n```\n",
+    "TCoT": "You are a table analyst. Your task is to answer questions based on the table content.\n\n\nThe answer should follow the format below:\n[Answer Format]\nFinal Answer: AnswerName1, AnswerName2...\n\nEnsure the final answer format is the last output line and can only be in the 'Final Answer: AnswerName1, AnswerName2...' form, no other form. Ensure the 'AnswerName' is a number or entity name, as short as possible, without any explanation.\n\n\nLet's think step by step and then give the final answer to the question.\n\nRead the table below in CSV format:\n[TABLE]\n```\n",
+    "PoT": "You are a data analyst proficient in Python. Your task is to write executable Python code to analyze the table and then answer questions.\n[Guidelines]\nYou should act following requirements below:\n1. based on the question, write out your analytical approach, and then write Python code according to this approach.\n2. The code needs to be concise and easy to understand, and if necessary, add comments for clarification.\n3. Code blocks need to strictly start with ```python and end with ```\n4. Your analysis must be based entirely on the above data. If the user's question is not related to data analysis, please politely refuse.\n5. You need to generate executable code. If there are results to be presented, please use the print function; if there are charts, please use the matplotlib library to draw them.\n6. Ensure to load the table with command ```df = pd.read_csv('table.csv')```\n\n\nThe generated Python code should follow the format below, and ensure the first two code lines is exactly the same with the following code block:\n[Python Code Format]\n```python\nimport pandas as pd\ndf = pd.read_csv('table.csv')\n...\nprint(f'Final Answer: {{answer}}')\n```\n\nEnsure the final answer is the last line in python code and can only be in the 'print(f'Final Answer: {{answer}}')' form, no other from. Ensure variable 'answer' can only be 'AnswerName1, AnswerName2...' form, no other form, and 'AnswerName' can only be a number or entity name, as short as possible, without any explanation.\n\n\nLet's think step by step and then generate python code to analyze table and present the final answer to the question.\n\nRead the table below in CSV format:\n[TABLE]\n```\n"
+}
 
 # 20250810: table first
-TABLE_PREFIX = "Read the table below in CSV format:\n[TABLE]\n```\n"
-TABLE_POSTFIX = "```\n\n"
-INSTRUCTION_MAP = {
-    "DP": "You are a table analyst. Your task is to answer questions based on the table content.\n\n\nThe answer should follow the format below:\n[Answer Format]\nFinal Answer: AnswerName1, AnswerName2...\n\nEnsure the final answer format is the last output line and can only be in the 'Final Answer: AnswerName1, AnswerName2...' form, no other form. Ensure the 'AnswerName' is a number or entity name, as short as possible, without any explanation.\n\n\nGive the final answer to the question directly without any explanation.\n\n",
-    "SCoT": "You are a table analyst. Your task is to utilize the Python package 'pandas' to analyze the table and then answer questions.\n[Guidelines]\nYou should act in following patterns step by step to analyze the table and then give the final answer:\n[Action Patterns]\nThought: You should always think about what to do to interact with Python code base on Result\nAction: the action can **ONLY** be single line python code\nResult: Simulate the result of the execution of the python code in Action, analyse that result and decide whether to continue or not\n(This thought/Action/Result can repeat N times)\n\n\nWhen you think the actions are enough to achieve the final answer, give the conclusion following the format below:\n[Answer Format]\nConclusion: After analyzing the table,I am confident that ...\bFinal Answer: AnswerName1, AnswerName2...\n\nEnsure the final answer format is the last output line and can only be in the 'Final Answer: AnswerName1, AnswerName2...' form, no other form. Ensure the 'AnswerName' is a number or entity name, as short as possible, without any explanation.\n\n\nLet's think step by step and then give the final answer to the question.\nEnsure to have a concluding thought that verifies the table, observations and the question before giving the final answer.\n",
-    "TCoT": "You are a table analyst. Your task is to answer questions based on the table content.\n\n\nThe answer should follow the format below:\n[Answer Format]\nFinal Answer: AnswerName1, AnswerName2...\n\nEnsure the final answer format is the last output line and can only be in the 'Final Answer: AnswerName1, AnswerName2...' form, no other form. Ensure the 'AnswerName' is a number or entity name, as short as possible, without any explanation.\n\n\nLet's think step by step and then give the final answer to the question.\n\n",
-    "PoT": "You are a data analyst proficient in Python. Your task is to write executable Python code to analyze the table and then answer questions.\n[Guidelines]\nYou should act following requirements below:\n1. based on the question, write out your analytical approach, and then write Python code according to this approach.\n2. The code needs to be concise and easy to understand, and if necessary, add comments for clarification.\n3. Code blocks need to strictly start with ```python and end with ```\n4. Your analysis must be based entirely on the above data. If the user's question is not related to data analysis, please politely refuse.\n5. You need to generate executable code. If there are results to be presented, please use the print function; if there are charts, please use the matplotlib library to draw them.\n6. Ensure to load the table with command ```df = pd.read_csv('table.csv')```\n\n\nThe generated Python code should follow the format below, and ensure the first two code lines is exactly the same with the following code block:\n[Python Code Format]\n```python\nimport pandas as pd\ndf = pd.read_csv('table.csv')\n...\nprint(f'Final Answer: {{answer}}')\n```\n\nEnsure the final answer is the last line in python code and can only be in the 'print(f'Final Answer: {{answer}}')' form, no other from. Ensure variable 'answer' can only be 'AnswerName1, AnswerName2...' form, no other form, and 'AnswerName' can only be a number or entity name, as short as possible, without any explanation.\n\n\nLet's think step by step and then generate python code to analyze table and present the final answer to the question.\n\n"
-}
+# TABLE_PREFIX = "Read the table below in CSV format:\n[TABLE]\n```\n"
+# TABLE_POSTFIX = "```\n\n"
+# INSTRUCTION_MAP = {
+#     "DP": "You are a table analyst. Your task is to answer questions based on the table content.\n\n\nThe answer should follow the format below:\n[Answer Format]\nFinal Answer: AnswerName1, AnswerName2...\n\nEnsure the final answer format is the last output line and can only be in the 'Final Answer: AnswerName1, AnswerName2...' form, no other form. Ensure the 'AnswerName' is a number or entity name, as short as possible, without any explanation.\n\n\nGive the final answer to the question directly without any explanation.\n\n",
+#     "SCoT": "You are a table analyst. Your task is to utilize the Python package 'pandas' to analyze the table and then answer questions.\n[Guidelines]\nYou should act in following patterns step by step to analyze the table and then give the final answer:\n[Action Patterns]\nThought: You should always think about what to do to interact with Python code base on Result\nAction: the action can **ONLY** be single line python code\nResult: Simulate the result of the execution of the python code in Action, analyse that result and decide whether to continue or not\n(This thought/Action/Result can repeat N times)\n\n\nWhen you think the actions are enough to achieve the final answer, give the conclusion following the format below:\n[Answer Format]\nConclusion: After analyzing the table,I am confident that ...\bFinal Answer: AnswerName1, AnswerName2...\n\nEnsure the final answer format is the last output line and can only be in the 'Final Answer: AnswerName1, AnswerName2...' form, no other form. Ensure the 'AnswerName' is a number or entity name, as short as possible, without any explanation.\n\n\nLet's think step by step and then give the final answer to the question.\nEnsure to have a concluding thought that verifies the table, observations and the question before giving the final answer.\n",
+#     "TCoT": "You are a table analyst. Your task is to answer questions based on the table content.\n\n\nThe answer should follow the format below:\n[Answer Format]\nFinal Answer: AnswerName1, AnswerName2...\n\nEnsure the final answer format is the last output line and can only be in the 'Final Answer: AnswerName1, AnswerName2...' form, no other form. Ensure the 'AnswerName' is a number or entity name, as short as possible, without any explanation.\n\n\nLet's think step by step and then give the final answer to the question.\n\n",
+#     "PoT": "You are a data analyst proficient in Python. Your task is to write executable Python code to analyze the table and then answer questions.\n[Guidelines]\nYou should act following requirements below:\n1. based on the question, write out your analytical approach, and then write Python code according to this approach.\n2. The code needs to be concise and easy to understand, and if necessary, add comments for clarification.\n3. Code blocks need to strictly start with ```python and end with ```\n4. Your analysis must be based entirely on the above data. If the user's question is not related to data analysis, please politely refuse.\n5. You need to generate executable code. If there are results to be presented, please use the print function; if there are charts, please use the matplotlib library to draw them.\n6. Ensure to load the table with command ```df = pd.read_csv('table.csv')```\n\n\nThe generated Python code should follow the format below, and ensure the first two code lines is exactly the same with the following code block:\n[Python Code Format]\n```python\nimport pandas as pd\ndf = pd.read_csv('table.csv')\n...\nprint(f'Final Answer: {{answer}}')\n```\n\nEnsure the final answer is the last line in python code and can only be in the 'print(f'Final Answer: {{answer}}')' form, no other from. Ensure variable 'answer' can only be 'AnswerName1, AnswerName2...' form, no other form, and 'AnswerName' can only be a number or entity name, as short as possible, without any explanation.\n\n\nLet's think step by step and then generate python code to analyze table and present the final answer to the question.\n\n"
+# }
+# INSTRUCTION_MAP = {
+#     "DP": "You are a table analyst. Your task is to answer questions based on the table content.\n\n\nThe answer should follow the format below:\n[Answer Format]\nFinal Answer: AnswerName1, AnswerName2...\n\nEnsure the final answer format is the last output line and can only be in the 'Final Answer: AnswerName1, AnswerName2...' form, no other form. Ensure the 'AnswerName' is a number or entity name, as short as possible, without any explanation.\n\n\nGive the final answer to the question directly without any explanation.",
+#     "SCoT": "You are a table analyst. Your task is to utilize the Python package 'pandas' to analyze the table and then answer questions.\n[Guidelines]\nYou should act in following patterns step by step to analyze the table and then give the final answer:\n[Action Patterns]\nThought: You should always think about what to do to interact with Python code base on Result\nAction: the action can **ONLY** be single line python code\nResult: Simulate the result of the execution of the python code in Action, analyse that result and decide whether to continue or not\n(This thought/Action/Result can repeat N times)\n\n\nWhen you think the actions are enough to achieve the final answer, give the conclusion following the format below:\n[Answer Format]\nConclusion: After analyzing the table,I am confident that ...\bFinal Answer: AnswerName1, AnswerName2...\n\nEnsure the final answer format is the last output line and can only be in the 'Final Answer: AnswerName1, AnswerName2...' form, no other form. Ensure the 'AnswerName' is a number or entity name, as short as possible, without any explanation.\n\n\nLet's think step by step and then give the final answer to the question.\nEnsure to have a concluding thought that verifies the table, observations and the question before giving the final answer.",
+#     "TCoT": "You are a table analyst. Your task is to answer questions based on the table content.\n\n\nThe answer should follow the format below:\n[Answer Format]\nFinal Answer: AnswerName1, AnswerName2...\n\nEnsure the final answer format is the last output line and can only be in the 'Final Answer: AnswerName1, AnswerName2...' form, no other form. Ensure the 'AnswerName' is a number or entity name, as short as possible, without any explanation.\n\n\nLet's think step by step and then give the final answer to the question.",
+#     "PoT": "You are a data analyst proficient in Python. Your task is to write executable Python code to analyze the table and then answer questions.\n[Guidelines]\nYou should act following requirements below:\n1. based on the question, write out your analytical approach, and then write Python code according to this approach.\n2. The code needs to be concise and easy to understand, and if necessary, add comments for clarification.\n3. Code blocks need to strictly start with ```python and end with ```\n4. Your analysis must be based entirely on the above data. If the user's question is not related to data analysis, please politely refuse.\n5. You need to generate executable code. If there are results to be presented, please use the print function; if there are charts, please use the matplotlib library to draw them.\n6. Ensure to load the table with command ```df = pd.read_csv('table.csv')```\n\n\nThe generated Python code should follow the format below, and ensure the first two code lines is exactly the same with the following code block:\n[Python Code Format]\n```python\nimport pandas as pd\ndf = pd.read_csv('table.csv')\n...\nprint(f'Final Answer: {{answer}}')\n```\n\nEnsure the final answer is the last line in python code and can only be in the 'print(f'Final Answer: {{answer}}')' form, no other from. Ensure variable 'answer' can only be 'AnswerName1, AnswerName2...' form, no other form, and 'AnswerName' can only be a number or entity name, as short as possible, without any explanation.\n\n\nLet's think step by step and then generate python code to analyze table and present the final answer to the question."
+# }
 class SamplePreprocessorForFinetune:
     def __init__(
         self,
@@ -196,18 +202,18 @@ class SamplePreprocessorForFinetune:
             )
             prefix_text, postfix_text = full_template.split("DUMMY_INPUT")
 
-        # # ==== 情况 2：无模板，使用vicuna默认格式 ====
-        # else:
-        #     prefix_text = "A chat between a curious user and an artificial intelligence assistant. " \
-        #                 + "The assistant gives helpful, detailed, and polite answers to the user's questions.\n\n" \
-        #                 + "USER: "
-        #     postfix_text = "\nASSISTANT:"
-
         # ==== 情况 2：无模板，使用vicuna默认格式 ====
         else:
-            self.prefix_ids = []
-            self.postfix_ids = []
-            return
+            prefix_text = "A chat between a curious user and an artificial intelligence assistant. " \
+                        + "The assistant gives helpful, detailed, and polite answers to the user's questions.\n\n" \
+                        + "USER: "
+            postfix_text = "\nASSISTANT:"
+
+        # # ==== 情况 2：无模板，使用vicuna默认格式 ====
+        # else:
+        #     self.prefix_ids = []
+        #     self.postfix_ids = []
+        #     return
         
         prefix_ids = self.tokenizer.encode(prefix_text)
         postfix_ids = self.tokenizer.encode(postfix_text)
@@ -228,7 +234,7 @@ class SamplePreprocessorForFinetune:
         qsubtype = sample['qsubtype']
         instruction_type = sample['instruction_type']
         instruction = INSTRUCTION_MAP[instruction_type]
-        question = f"Let's get start!\nQuestion: {sample['question']}"
+        question = f"```\n\nLet's get start!\nQuestion: {sample['question']}"
         answer = sample['response']
 
         df_aug = df.map(lambda x: str(x) + self.beacon_token * self.beacon_size)
@@ -238,25 +244,19 @@ class SamplePreprocessorForFinetune:
         input_ids = []
         input_ids.extend(self.prefix_ids)
 
-        # table
-        input_ids.extend(self.tokenizer.encode(TABLE_PREFIX, add_special_tokens=False))
+        # instruction
+        input_ids.extend(self.tokenizer.encode(instruction, add_special_tokens=False))
         header_ids = self.tokenizer.encode(','.join(df.columns.to_list())+"\n", add_special_tokens=False)
         input_ids.extend(header_ids)
         segment_ids = [0] * len(input_ids)
         is_beacon = [0] * len(input_ids)
+
+        # table
         for row_idx, row in enumerate(rows):
             row_input_ids, row_segment_ids, row_is_beacon = self.tokenize_row(row, row_idx)
             input_ids.extend(row_input_ids)
             segment_ids.extend(row_segment_ids)
             is_beacon.extend(row_is_beacon)
-        input_ids.extend(self.tokenizer.encode(TABLE_POSTFIX, add_special_tokens=False))
-        segment_ids.extend([0] * len(self.tokenizer.encode(TABLE_POSTFIX, add_special_tokens=False)))
-        is_beacon.extend([0] * len(self.tokenizer.encode(TABLE_POSTFIX, add_special_tokens=False)))
-
-        # instruction
-        input_ids.extend(self.tokenizer.encode(instruction, add_special_tokens=False))
-        segment_ids.extend([0] * len(self.tokenizer.encode(instruction, add_special_tokens=False)))
-        is_beacon.extend([0] * len(self.tokenizer.encode(instruction, add_special_tokens=False)))
 
         # question + postfix
         question_ids = self.tokenizer.encode(question, add_special_tokens=False) + self.postfix_ids
@@ -354,29 +354,24 @@ class SamplePreprocessor:
 
         df_aug = df.map(lambda x: str(x) + self.beacon_token * self.beacon_size)
         rows = df_aug.values.tolist()
+
         # prefix
         input_ids = []
         input_ids.extend(self.prefix_ids)
 
-        # table
-        input_ids.extend(self.tokenizer.encode(TABLE_PREFIX, add_special_tokens=False))
+        # instruction
+        input_ids.extend(self.tokenizer.encode(instruction, add_special_tokens=False))
         header_ids = self.tokenizer.encode(','.join(df.columns.to_list())+"\n", add_special_tokens=False)
         input_ids.extend(header_ids)
         segment_ids = [0] * len(input_ids)
         is_beacon = [0] * len(input_ids)
+
+        # table
         for row_idx, row in enumerate(rows):
             row_input_ids, row_segment_ids, row_is_beacon = self.tokenize_row(row, row_idx)
             input_ids.extend(row_input_ids)
             segment_ids.extend(row_segment_ids)
             is_beacon.extend(row_is_beacon)
-        input_ids.extend(self.tokenizer.encode(TABLE_POSTFIX, add_special_tokens=False))
-        segment_ids.extend([0] * len(self.tokenizer.encode(TABLE_POSTFIX, add_special_tokens=False)))
-        is_beacon.extend([0] * len(self.tokenizer.encode(TABLE_POSTFIX, add_special_tokens=False)))
-
-        # instruction
-        input_ids.extend(self.tokenizer.encode(instruction, add_special_tokens=False))
-        segment_ids.extend([0] * len(self.tokenizer.encode(instruction, add_special_tokens=False)))
-        is_beacon.extend([0] * len(self.tokenizer.encode(instruction, add_special_tokens=False)))
 
         # question + postfix
         question_ids = self.tokenizer.encode(question, add_special_tokens=False) + self.postfix_ids
