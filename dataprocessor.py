@@ -54,11 +54,17 @@ class SamplePreprocessorForPretrain:
             prefix_text, postfix_text = full_template.split("DUMMY_INPUT")
 
         # ==== 情况 2：无模板，使用vicuna默认格式 ====
+        # else:
+        #     prefix_text = "A chat between a curious user and an artificial intelligence assistant. " \
+        #                 + "The assistant gives helpful, detailed, and polite answers to the user's questions.\n\n" \
+        #                 + "USER: "
+        #     postfix_text = "\nASSISTANT:"
+
+        # ==== 情况 2：无模板，使用vicuna默认格式 ====
         else:
-            prefix_text = "A chat between a curious user and an artificial intelligence assistant. " \
-                        + "The assistant gives helpful, detailed, and polite answers to the user's questions.\n\n" \
-                        + "USER: "
-            postfix_text = "\nASSISTANT:"
+            self.prefix_ids = []
+            self.postfix_ids = []
+            return
         
         prefix_ids = self.tokenizer.encode(prefix_text)
         postfix_ids = self.tokenizer.encode(postfix_text)
@@ -203,17 +209,17 @@ class SamplePreprocessorForFinetune:
             prefix_text, postfix_text = full_template.split("DUMMY_INPUT")
 
         # ==== 情况 2：无模板，使用vicuna默认格式 ====
-        else:
-            prefix_text = "A chat between a curious user and an artificial intelligence assistant. " \
-                        + "The assistant gives helpful, detailed, and polite answers to the user's questions.\n\n" \
-                        + "USER: "
-            postfix_text = "\nASSISTANT:"
-
-        # # ==== 情况 2：无模板，使用vicuna默认格式 ====
         # else:
-        #     self.prefix_ids = []
-        #     self.postfix_ids = []
-        #     return
+        #     prefix_text = "A chat between a curious user and an artificial intelligence assistant. " \
+        #                 + "The assistant gives helpful, detailed, and polite answers to the user's questions.\n\n" \
+        #                 + "USER: "
+        #     postfix_text = "\nASSISTANT:"
+
+        # ==== 情况 2：无模板，使用vicuna默认格式 ====
+        else:
+            self.prefix_ids = []
+            self.postfix_ids = []
+            return
         
         prefix_ids = self.tokenizer.encode(prefix_text)
         postfix_ids = self.tokenizer.encode(postfix_text)
@@ -326,11 +332,17 @@ class SamplePreprocessor:
             prefix_text, postfix_text = full_template.split("DUMMY_INPUT")
 
         # ==== 情况 2：无模板，使用vicuna默认格式 ====
+        # else:
+        #     prefix_text = "A chat between a curious user and an artificial intelligence assistant. " \
+        #                 + "The assistant gives helpful, detailed, and polite answers to the user's questions.\n\n" \
+        #                 + "USER: "
+        #     postfix_text = "\nASSISTANT:"
+
+        # ==== 情况 2：无模板，使用vicuna默认格式 ====
         else:
-            prefix_text = "A chat between a curious user and an artificial intelligence assistant. " \
-                        + "The assistant gives helpful, detailed, and polite answers to the user's questions.\n\n" \
-                        + "USER: "
-            postfix_text = "\nASSISTANT:"
+            self.prefix_ids = []
+            self.postfix_ids = []
+            return
         
         prefix_ids = self.tokenizer.encode(prefix_text)
         postfix_ids = self.tokenizer.encode(postfix_text)
