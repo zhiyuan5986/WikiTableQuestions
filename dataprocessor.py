@@ -152,6 +152,7 @@ class SamplePreprocessorForPretrain:
                 cell_text = str(cell)
                 sep_token_ids = self.tokenizer.encode("\n", add_special_tokens=False)
                 sep_token_ids = sep_token_ids if isinstance(sep_token_ids, list) else [sep_token_ids]
+                cell_ids = self.tokenizer.encode(cell_text, add_special_tokens=False)
                 row_is_beacon.extend([0] * len(cell_ids) + [1] * self.beacon_size + [0]* len(sep_token_ids))
                 cell_ids += [self.beacon_token_id] * self.beacon_size + sep_token_ids
             row_input_ids.extend(cell_ids)
@@ -306,12 +307,14 @@ class SamplePreprocessorForFinetune:
                 cell_text = str(cell)
                 sep_token_ids = self.tokenizer.encode(",", add_special_tokens=False)
                 sep_token_ids = sep_token_ids if isinstance(sep_token_ids, list) else [sep_token_ids]
+                cell_ids = self.tokenizer.encode(cell_text, add_special_tokens=False)
                 row_is_beacon.extend([0] * len(cell_ids) + [1] * self.beacon_size + [0]* len(sep_token_ids))
                 cell_ids += [self.beacon_token_id] * self.beacon_size + sep_token_ids
             else:
                 cell_text = str(cell)
                 sep_token_ids = self.tokenizer.encode("\n", add_special_tokens=False)
                 sep_token_ids = sep_token_ids if isinstance(sep_token_ids, list) else [sep_token_ids]
+                cell_ids = self.tokenizer.encode(cell_text, add_special_tokens=False)
                 row_is_beacon.extend([0] * len(cell_ids) + [1] * self.beacon_size + [0]* len(sep_token_ids))
                 cell_ids += [self.beacon_token_id] * self.beacon_size + sep_token_ids
             row_input_ids.extend(cell_ids)
@@ -424,12 +427,14 @@ class SamplePreprocessor:
                 cell_text = str(cell)
                 sep_token_ids = self.tokenizer.encode(",", add_special_tokens=False)
                 sep_token_ids = sep_token_ids if isinstance(sep_token_ids, list) else [sep_token_ids]
+                cell_ids = self.tokenizer.encode(cell_text, add_special_tokens=False)
                 row_is_beacon.extend([0] * len(cell_ids) + [1] * self.beacon_size + [0]* len(sep_token_ids))
                 cell_ids += [self.beacon_token_id] * self.beacon_size + sep_token_ids
             else:
                 cell_text = str(cell)
                 sep_token_ids = self.tokenizer.encode("\n", add_special_tokens=False)
                 sep_token_ids = sep_token_ids if isinstance(sep_token_ids, list) else [sep_token_ids]
+                cell_ids = self.tokenizer.encode(cell_text, add_special_tokens=False)
                 row_is_beacon.extend([0] * len(cell_ids) + [1] * self.beacon_size + [0]* len(sep_token_ids))
                 cell_ids += [self.beacon_token_id] * self.beacon_size + sep_token_ids
             row_input_ids.extend(cell_ids)
