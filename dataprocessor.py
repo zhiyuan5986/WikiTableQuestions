@@ -82,8 +82,8 @@ class SamplePreprocessorForPretrain:
 
         df = sample['df'] # pd.DataFrame
 
-        df_aug = df.map(lambda x: str(x) + self.beacon_token * self.beacon_size)
-        rows = df_aug.values.tolist()
+        # df_aug = df.map(lambda x: str(x) + self.beacon_token * self.beacon_size)
+        rows = df.values.tolist()
 
         # prefix + header
         input_ids = []
@@ -249,8 +249,8 @@ class SamplePreprocessorForFinetune:
         question = f"```\n\nLet's get start!\nQuestion: {sample['question']}"
         answer = sample['response']
 
-        df_aug = df.map(lambda x: str(x) + self.beacon_token * self.beacon_size)
-        rows = df_aug.values.tolist()
+        # df_aug = df.map(lambda x: str(x) + self.beacon_token * self.beacon_size)
+        rows = df.values.tolist()
 
         # prefix
         input_ids = []
@@ -376,8 +376,8 @@ class SamplePreprocessor:
         question = f"```\n\nLet's get start!\nQuestion: {sample['question']}"
         answer = sample['answer']
 
-        df_aug = df.map(lambda x: str(x) + self.beacon_token * self.beacon_size)
-        rows = df_aug.values.tolist()
+        # df_aug = df.map(lambda x: str(x) + self.beacon_token * self.beacon_size)
+        rows = df.values.tolist()
 
         # prefix
         input_ids = []
