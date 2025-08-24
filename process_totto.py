@@ -7,7 +7,7 @@ from tqdm import tqdm
 dataset = datasets.load_dataset(
     "json",
     data_files={
-        "train": "/home/qiaoan/data/totto_data/totto_train_data.jsonl",
+        "train": "/mnt/hdd-storage/storage_all_users/qiaoan/data/totto_data/totto_train_data.jsonl",
         # "validation": "/home/qiaoan/data/totto_data/totto_dev_data.jsonl",
     },
 )

@@ -1,5 +1,6 @@
 import os
 import json
+import torch
 import pandas as pd
 from copy import deepcopy
 from transformers import HfArgumentParser
@@ -124,6 +125,7 @@ if __name__ == "__main__":
 
         with open(save_path, 'w') as fout:
             for idx, line in tqdm(enumerate(lines), total=len(lines)):
+                torch.cuda.empty_cache()
                 sample_id = line['id']
                 if sample_id in saved:
                     fout.write(json.dumps(saved[sample_id]) + '\n')
@@ -142,6 +144,12 @@ if __name__ == "__main__":
                 position_ids = sample['position_ids'].to('cuda')
                 question_ids = sample['question_ids'].to('cuda')
                 is_beacon = sample['is_beacon'].to('cuda')
+
+                # input_ids = sample['input_ids']
+                # attention_mask = sample['attention_mask']
+                # position_ids = sample['position_ids']
+                # question_ids = sample['question_ids']
+                # is_beacon = sample['is_beacon']
 
                 input_ids, attention_mask, position_ids, past_key_values = model.construct_inputs_for_generation(
                     input_ids=input_ids,
