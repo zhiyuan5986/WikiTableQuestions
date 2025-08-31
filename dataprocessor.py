@@ -98,7 +98,7 @@ class SamplePreprocessorForPretrain:
         length = len(input_ids)
         row_nums = 0
         for row_idx, row in enumerate(rows):
-            row_input_ids, row_segment_ids, row_is_beacon = self.tokenize_row(row, row_idx)
+            row_input_ids, row_segment_ids, row_is_beacon = self.tokenize_row(row, row_idx + 1)
             if length + len(row_input_ids) > self.max_length:
                 break
             input_ids.extend(row_input_ids)
@@ -265,7 +265,7 @@ class SamplePreprocessorForFinetune:
 
         # table
         for row_idx, row in enumerate(rows):
-            row_input_ids, row_segment_ids, row_is_beacon = self.tokenize_row(row, row_idx)
+            row_input_ids, row_segment_ids, row_is_beacon = self.tokenize_row(row, row_idx + 1)
             input_ids.extend(row_input_ids)
             segment_ids.extend(row_segment_ids)
             is_beacon.extend(row_is_beacon)
@@ -392,7 +392,7 @@ class SamplePreprocessor:
 
         # table
         for row_idx, row in enumerate(rows):
-            row_input_ids, row_segment_ids, row_is_beacon = self.tokenize_row(row, row_idx)
+            row_input_ids, row_segment_ids, row_is_beacon = self.tokenize_row(row, row_idx + 1)
             input_ids.extend(row_input_ids)
             segment_ids.extend(row_segment_ids)
             is_beacon.extend(row_is_beacon)
