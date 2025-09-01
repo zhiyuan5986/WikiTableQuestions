@@ -156,7 +156,7 @@ class SamplePreprocessorForPretrain:
             #     row_is_beacon.extend([0] * len(cell_ids) + [1] * self.beacon_size + [0]* len(sep_token_ids))
             #     cell_ids += [self.beacon_token_id] * self.beacon_size + sep_token_ids
             sep_text = ',' if idx != len(row) - 1 else '\n'
-            cell_text = str(cell+sep_text)
+            cell_text = str(cell)+sep_text
             cell_ids = self.tokenizer.encode(cell_text, add_special_tokens=False)
             row_is_beacon.extend([0] * len(cell_ids) + [1] * self.beacon_size)
             cell_ids += [self.beacon_token_id] * self.beacon_size
@@ -323,7 +323,7 @@ class SamplePreprocessorForFinetune:
             #     row_is_beacon.extend([0] * len(cell_ids) + [1] * self.beacon_size + [0]* len(sep_token_ids))
             #     cell_ids += [self.beacon_token_id] * self.beacon_size + sep_token_ids
             sep_text = ',' if idx != len(row) - 1 else '\n'
-            cell_text = str(cell+sep_text)
+            cell_text = str(cell) + sep_text
             cell_ids = self.tokenizer.encode(cell_text, add_special_tokens=False)
             row_is_beacon.extend([0] * len(cell_ids) + [1] * self.beacon_size)
             cell_ids += [self.beacon_token_id] * self.beacon_size
@@ -448,7 +448,7 @@ class SamplePreprocessor:
             #     row_is_beacon.extend([0] * len(cell_ids) + [1] * self.beacon_size + [0]* len(sep_token_ids))
             #     cell_ids += [self.beacon_token_id] * self.beacon_size + sep_token_ids
             sep_text = ',' if idx != len(row) - 1 else '\n'
-            cell_text = str(cell+sep_text)
+            cell_text = str(cell) + sep_text
             cell_ids = self.tokenizer.encode(cell_text, add_special_tokens=False)
             row_is_beacon.extend([0] * len(cell_ids) + [1] * self.beacon_size)
             cell_ids += [self.beacon_token_id] * self.beacon_size
