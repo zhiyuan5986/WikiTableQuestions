@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import logging
+import threading
 from typing import Dict, Any, Union, Optional, List, Tuple
 from transformers import Trainer
 from transformers.utils import cached_property, is_torch_npu_available
@@ -25,14 +26,17 @@ class CHATrainer(Trainer):
         os.makedirs(output_dir, exist_ok=True)
         logger.info(f"Saving model checkpoint to {output_dir}")
 
-        if last_checkpoint is not None:
-            logger.info(f"Deleting previous checkpoint: {last_checkpoint}")
-            shutil.rmtree(last_checkpoint)
-
         self.model.save_pretrained(output_dir)
 
         # Good practice: save your training arguments together with the trained model
         torch.save(self.args, os.path.join(output_dir, "training_args.bin"))
+
+        if last_checkpoint is not None:
+            logger.info(f"Scheduling deletion of previous checkpoint: {last_checkpoint} in 10 minutes")
+            # 创建延迟删除的定时器（20分钟 = 1200秒）
+            timer = threading.Timer(1200.0, shutil.rmtree, args=[last_checkpoint])
+            timer.daemon = True  # 设置为守护线程，确保程序退出时线程也会退出
+            timer.start()
 
     # def _load_from_checkpoint(self, resume_from_checkpoint, model=None):
     #     # TODO
