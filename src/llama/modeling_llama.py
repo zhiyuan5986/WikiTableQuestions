@@ -980,6 +980,7 @@ import math
 import torch
 import torch.nn as nn
 import logging
+from itertools import groupby
 from transformers.models.llama.modeling_llama import (
     LlamaAttention, 
     LlamaDecoderLayer, 
@@ -1631,11 +1632,139 @@ class LlamaForCausalLMWithBeacon(LlamaForCausalLM):
     #     position_ids = torch.arange(old_length, old_length + question_ids.size(1), device=input_ids.device).unsqueeze(0)
     #     return input_ids, attention_mask, position_ids, past_key_values
 
+    # @torch.no_grad()
+    # def construct_inputs_for_generation(
+    #     self,
+    #     input_ids: torch.LongTensor,
+    #     question_ids: torch.LongTensor,
+    #     segment_ids: torch.LongTensor,
+    #     is_beacon: Optional[torch.BoolTensor] = None,
+    # ):
+    #     # segment_ids is a list of segment ids for each token in the input_ids
+    #     # e.g. [0, 0, 0, 1, 1, 1, 2, 2, 3, 3, 3, 3, 4, 4, 4, 0, 0, 0, 0]
+    #     # We need to extract each segment and iteratively construct the inputs for generation
+
+    #     # First, split segment_ids by the same value, e.g. we get a 2D list [[0, 0, 0], [1, 1, 1], [2, 2], [3, 3, 3, 3], [4, 4, 4], [0, 0, 0, 0]]
+        
+    #     segment_ids = segment_ids.squeeze().tolist()
+    #     # print(segment_ids)
+    #     segments = [list(group) for key, group in groupby(segment_ids)]
+    #     segments_lens = [len(segment) for segment in segments]
+    #     segments_start_end = [(0, segments_lens[0])]
+    #     for i in range(1, len(segments_lens)):
+    #         segments_start_end.append((segments_start_end[-1][1], segments_start_end[-1][1] + segments_lens[i]))
+
+    #     attention_mask = torch.ones((input_ids.shape[0], input_ids.shape[1]), dtype=torch.long, device=input_ids.device)
+    #     position_ids = torch.arange(input_ids.shape[1], device=input_ids.device).unsqueeze(0)
+    #     # 1. I want to extract the cur_input_ids in the same segment
+    #     past_key_values = None # FIXME
+    #     for s, e in segments_start_end:
+    #         print(s, e)
+    #         cur_input_ids = input_ids[:, s:e]
+    #         cur_position_ids = position_ids[:, s:e]
+    #         cur_is_beacon = is_beacon[:, s:e]
+    #         print(cur_is_beacon.sum())
+    #         outputs = self(
+    #             input_ids=cur_input_ids,
+    #             position_ids=cur_position_ids,
+    #             is_beacon=cur_is_beacon,
+    #             past_key_values = past_key_values,
+    #             use_cache=True,
+    #         )
+    #         # true_indices = torch.nonzero(is_beacon, as_tuple=True)
+    #         # is_table = len(true_indices[1]) > 0
+    #         is_table = cur_is_beacon.any().item()
+    #         if is_table:
+    #             # retain_mask = is_beacon.clone()
+    #             # first_true_index = true_indices[1][0]
+    #             # retain_mask[:, first_true_index:] = True
+    #             # cat the past_key_values 
+    #             retain_mask = cur_is_beacon.squeeze()
+    #             if past_key_values is None:
+    #                 past_key_values = [
+    #                     (
+    #                         key[:, :, retain_mask, :], value[:, :, retain_mask, :],
+    #                     )
+    #                     for key, value in outputs.past_key_values
+    #                 ]
+    #             else:
+    #                 past_key_values = [
+    #                     (
+    #                         torch.cat([key1, key2[:, :, -len(retain_mask):, :][:, :, retain_mask, :]], dim=2),
+    #                         torch.cat([value1, value2[:, :, -len(retain_mask):, :][:, :, retain_mask, :]], dim=2),
+    #                     )
+    #                     for (key1, value1), (key2, value2) in zip(
+    #                         past_key_values, outputs.past_key_values
+    #                     )
+    #                 ]
+    #         else:
+    #             past_key_values = outputs.past_key_values
+    #         del outputs
+
+    #     # print("Previous length: ", position_ids.shape[1])
+    #     # print("Now length: ", past_key_values[0][0].shape[2])
+    #     old_length = position_ids.shape[1]
+    #     new_length = past_key_values[0][0].shape[2]
+    #     input_ids = question_ids
+    #     attention_mask = torch.ones((input_ids.shape[0], new_length + input_ids.shape[1]), dtype=torch.long, device=input_ids.device)
+    #     position_ids = torch.arange(old_length, old_length + question_ids.size(1), device=input_ids.device).unsqueeze(0)
+    #     return input_ids, attention_mask, position_ids, past_key_values
+
+    # @torch.no_grad()
+    # def generate(
+    #     self,
+    #     input_ids: torch.LongTensor,
+    #     attention_mask: torch.Tensor,
+    #     position_ids: torch.LongTensor,
+    #     past_key_values: Optional[Union[Cache, List[torch.FloatTensor]]] = None,
+    #     max_new_tokens: int = 8000,
+    #     eos_token_id: Optional[int] = None,
+    # ) -> torch.LongTensor:
+    #     self.eval()
+    #     device = input_ids.device
+    #     assert input_ids.size(0) == 1, "Only batch size = 1 is supported."
+
+    #     eos_token_id = eos_token_id if eos_token_id is not None else self.config.eos_token_id
+    #     if not isinstance(eos_token_id, list):
+    #         eos_token_id = [eos_token_id]
+
+    #     for step in range(max_new_tokens):
+    #         # 只取当前 token 作为输入
+    #         cur_input_ids = input_ids[:, -1:] if step > 0 else input_ids
+    #         cur_position_ids = position_ids[:, -1:] if step > 0 else position_ids
+
+    #         outputs = self(
+    #             input_ids=cur_input_ids,
+    #             attention_mask=attention_mask,
+    #             position_ids=cur_position_ids,
+    #             past_key_values=past_key_values,
+    #             use_cache=True,
+    #         )
+
+    #         logits = outputs.logits[:, -1, :]  # (1, vocab_size)
+    #         next_token = torch.argmax(logits, dim=-1, keepdim=True)  # (1, 1)
+
+    #         input_ids = torch.cat([input_ids, next_token], dim=-1)
+
+    #         if next_token.item() in eos_token_id:
+    #             break
+
+    #         # 更新 position_ids、attention_mask、past_key_values
+    #         next_position = position_ids[:, -1:] + 1
+    #         position_ids = torch.cat([position_ids, next_position], dim=1)
+
+    #         attention_mask = torch.cat(
+    #             [attention_mask, torch.ones((1, 1), dtype=torch.long, device=device)],
+    #             dim=1,
+    #         )
+    #         past_key_values = outputs.past_key_values
+
+    #     return input_ids
+
     @torch.no_grad()
-    def construct_inputs_for_generation(
+    def prefill(
         self,
         input_ids: torch.LongTensor,
-        question_ids: torch.LongTensor,
         segment_ids: torch.LongTensor,
         is_beacon: Optional[torch.BoolTensor] = None,
     ):
@@ -1658,11 +1787,11 @@ class LlamaForCausalLMWithBeacon(LlamaForCausalLM):
         # 1. I want to extract the cur_input_ids in the same segment
         past_key_values = None # FIXME
         for s, e in segments_start_end:
-            print(s, e)
+            # print(s, e)
             cur_input_ids = input_ids[:, s:e]
             cur_position_ids = position_ids[:, s:e]
             cur_is_beacon = is_beacon[:, s:e]
-            print(cur_is_beacon.sum())
+            # print(cur_is_beacon.sum())
             outputs = self(
                 input_ids=cur_input_ids,
                 position_ids=cur_position_ids,
@@ -1698,19 +1827,20 @@ class LlamaForCausalLMWithBeacon(LlamaForCausalLM):
                     ]
             else:
                 past_key_values = outputs.past_key_values
-            del outputs
+        logits = outputs.logits[:, -1, :]  # (1, vocab_size)
+        next_token = torch.argmax(logits, dim=-1, keepdim=True)  # (1, 1)
 
         # print("Previous length: ", position_ids.shape[1])
         # print("Now length: ", past_key_values[0][0].shape[2])
         old_length = position_ids.shape[1]
         new_length = past_key_values[0][0].shape[2]
-        input_ids = question_ids
+        input_ids = next_token
         attention_mask = torch.ones((input_ids.shape[0], new_length + input_ids.shape[1]), dtype=torch.long, device=input_ids.device)
-        position_ids = torch.arange(old_length, old_length + question_ids.size(1), device=input_ids.device).unsqueeze(0)
+        position_ids = torch.LongTensor([[old_length]]).to(input_ids.device)
         return input_ids, attention_mask, position_ids, past_key_values
-
+    
     @torch.no_grad()
-    def generate(
+    def decode(
         self,
         input_ids: torch.LongTensor,
         attention_mask: torch.Tensor,
@@ -1729,8 +1859,8 @@ class LlamaForCausalLMWithBeacon(LlamaForCausalLM):
 
         for step in range(max_new_tokens):
             # 只取当前 token 作为输入
-            cur_input_ids = input_ids[:, -1:] if step > 0 else input_ids
-            cur_position_ids = position_ids[:, -1:] if step > 0 else position_ids
+            cur_input_ids = input_ids[:, -1:]
+            cur_position_ids = position_ids[:, -1:]
 
             outputs = self(
                 input_ids=cur_input_ids,

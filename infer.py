@@ -9,6 +9,7 @@ from dataprocessor import SamplePreprocessor, CHADataCollator
 from dataclasses import dataclass, field
 from typing import Optional
 from tqdm import tqdm
+import time
 
 @dataclass
 class InferArguments:
@@ -123,11 +124,21 @@ if __name__ == "__main__":
         else:
             saved = {}
 
+        # 初始化计时变量
+        total_prefill_time = 0.0
+        total_decode_time = 0.0
+        processed_count = 0
+        
         with open(save_path, 'w') as fout:
             for idx, line in tqdm(enumerate(lines), total=len(lines)):
                 torch.cuda.empty_cache()
                 sample_id = line['id']
                 if sample_id in saved:
+                    # 如果已经处理过，从保存的数据中恢复时间统计
+                    if 'prefill_time' in saved[sample_id] and 'decode_time' in saved[sample_id]:
+                        total_prefill_time += saved[sample_id]['prefill_time']
+                        total_decode_time += saved[sample_id]['decode_time']
+                        processed_count += 1
                     fout.write(json.dumps(saved[sample_id]) + '\n')
                     continue
 
@@ -137,13 +148,12 @@ if __name__ == "__main__":
                 sample['df'] = df
                 sample['instruction_type'] = instruction_type
                 processed_sample = preprocessor(sample)
-                sample = data_collator([processed_sample])
+                # sample = data_collator([processed_sample])
+                sample = processed_sample
 
-                input_ids = sample['input_ids'].to('cuda')
-                attention_mask = sample['attention_mask'].to('cuda')
-                position_ids = sample['position_ids'].to('cuda')
-                question_ids = sample['question_ids'].to('cuda')
-                is_beacon = sample['is_beacon'].to('cuda')
+                input_ids = torch.LongTensor(sample['input_ids']).unsqueeze(0).cuda()
+                segment_ids = torch.LongTensor(sample['segment_ids']).unsqueeze(0).cuda()  # (1, L)
+                is_beacon = torch.tensor(sample['is_beacon'], dtype=torch.bool).unsqueeze(0).cuda()
 
                 # input_ids = sample['input_ids']
                 # attention_mask = sample['attention_mask']
@@ -151,13 +161,15 @@ if __name__ == "__main__":
                 # question_ids = sample['question_ids']
                 # is_beacon = sample['is_beacon']
 
-                input_ids, attention_mask, position_ids, past_key_values = model.construct_inputs_for_generation(
+                # 记录prefill时间
+                prefill_start = time.time()
+                input_ids, attention_mask, position_ids, past_key_values = model.prefill(
                     input_ids=input_ids,
-                    attention_mask=attention_mask,
-                    position_ids=position_ids,
-                    question_ids=question_ids,
+                    segment_ids=segment_ids,
                     is_beacon=is_beacon
                 )
+                prefill_time = time.time() - prefill_start
+                total_prefill_time += prefill_time
 
                 inputs = {
                     "input_ids": input_ids,
@@ -166,15 +178,34 @@ if __name__ == "__main__":
                     "past_key_values": past_key_values,
                 }
 
-                output_ids = model.generate(
+                # 记录decode时间
+                decode_start = time.time()
+                output_ids = model.decode(
                     **inputs,
                     max_new_tokens=8000,
                 )
-                generated_texts = tokenizer.decode(output_ids[0][len(input_ids[0]):], skip_special_tokens=True)
+                decode_time = time.time() - decode_start
+                total_decode_time += decode_time
+                processed_count += 1
+
+                # generated_texts = tokenizer.decode(output_ids[0][len(input_ids[0]):], skip_special_tokens=True)
+                generated_texts = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
                 print(f"{idx}: generated: {generated_texts}, answer: {line['answer']}")
 
                 line['prediction'] = generated_texts
                 line['model_name'] = model_name
+                # 保存时间信息用于resume
+                line['prefill_time'] = prefill_time
+                line['decode_time'] = decode_time
 
                 fout.write(json.dumps(line) + '\n')
+
+        # 计算并输出平均时间
+        if processed_count > 0:
+            avg_prefill = total_prefill_time / processed_count
+            avg_decode = total_decode_time / processed_count
+            print(f"File {filename}: Average prefill time: {avg_prefill:.4f}s, Average decode time: {avg_decode:.4f}s")
+            print(f"File {filename}: Total processed samples: {processed_count}")
+        else:
+            print(f"File {filename}: No new samples processed")

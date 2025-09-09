@@ -409,6 +409,9 @@ class SamplePreprocessor:
 
         # question + postfix
         question_ids = self.tokenizer.encode(question, add_special_tokens=False) + self.postfix_ids
+        input_ids.extend(question_ids)
+        segment_ids.extend([0] * len(question_ids))
+        is_beacon.extend([0] * len(question_ids))
 
         # labels
         label_ids = self.tokenizer.encode(answer, add_special_tokens=False)
